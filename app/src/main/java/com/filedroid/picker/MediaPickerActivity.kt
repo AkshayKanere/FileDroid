@@ -48,6 +48,18 @@ class MediaPickerActivity : AppCompatActivity() {
             }
         }
 
+        // Increase touch slop so vertical scrolling in RecyclerView isn't
+        // intercepted by ViewPager2's horizontal swipe detection
+        try {
+            val recyclerViewField = androidx.viewpager2.widget.ViewPager2::class.java.getDeclaredField("mRecyclerView")
+            recyclerViewField.isAccessible = true
+            val recyclerView = recyclerViewField.get(binding.viewPager) as androidx.recyclerview.widget.RecyclerView
+            val touchSlopField = androidx.recyclerview.widget.RecyclerView::class.java.getDeclaredField("mTouchSlop")
+            touchSlopField.isAccessible = true
+            val touchSlop = touchSlopField.getInt(recyclerView)
+            touchSlopField.setInt(recyclerView, touchSlop * 3)
+        } catch (_: Exception) { }
+
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = "${tabEmojis[position]} ${tabTitles[position]}"
         }.attach()
