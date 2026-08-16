@@ -273,84 +273,146 @@ public abstract class NanoHTTPD {
 
         private void parseMultipart(String boundary, Map<String, String> files)
                 throws IOException, ResponseException {
-            byte[] data = readBytes(inputStream, contentLength);
-            String fullBoundary = "--" + boundary;
-            String endBoundary = fullBoundary + "--";
+            // Stream entire body to a temp file first to avoid OOM on large uploads
+            File bodyFile = File.createTempFile("nanohttpd-multipart-", ".tmp");
+            bodyFile.deleteOnExit();
+            try (FileOutputStream bodyOut = new FileOutputStream(bodyFile)) {
+                copyStream(inputStream, bodyOut, contentLength);
+            }
 
-            // Split data by boundary
-            String dataStr = new String(data, StandardCharsets.ISO_8859_1);
-            int pos = dataStr.indexOf(fullBoundary);
-            if (pos < 0) return;
+            byte[] fullBoundary = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
 
-            while (pos >= 0) {
-                // Move past the boundary line
-                pos += fullBoundary.length();
-                // Check for closing boundary
-                if (pos + 2 <= dataStr.length() && dataStr.substring(pos, pos + 2).equals("--")) {
-                    break; // End of multipart
-                }
-                // Skip CRLF after boundary
-                if (pos < dataStr.length() && dataStr.charAt(pos) == '\r') pos++;
-                if (pos < dataStr.length() && dataStr.charAt(pos) == '\n') pos++;
+            try (RandomAccessFile raf = new RandomAccessFile(bodyFile, "r")) {
+                long fileLen = raf.length();
 
-                // Parse part headers
-                Map<String, String> partHeaders = new HashMap<>();
-                while (pos < dataStr.length()) {
-                    int lineEnd = dataStr.indexOf("\r\n", pos);
-                    if (lineEnd < 0) lineEnd = dataStr.length();
-                    String headerLine = dataStr.substring(pos, lineEnd);
-                    pos = lineEnd + 2; // Skip CRLF
-                    if (headerLine.isEmpty()) break; // Empty line = end of headers
+                // Find first boundary
+                long pos = findBytes(raf, fullBoundary, 0);
+                if (pos < 0) return;
 
-                    int ci = headerLine.indexOf(':');
-                    if (ci > 0) {
-                        partHeaders.put(
-                                headerLine.substring(0, ci).trim().toLowerCase(),
-                                headerLine.substring(ci + 1).trim());
+                while (pos >= 0 && pos < fileLen) {
+                    pos += fullBoundary.length;
+                    if (pos >= fileLen) break;
+
+                    // Check for closing boundary (--)
+                    raf.seek(pos);
+                    if (pos + 2 <= fileLen) {
+                        int b1 = raf.read();
+                        int b2 = raf.read();
+                        if (b1 == '-' && b2 == '-') break;
                     }
-                }
 
-                String disposition = partHeaders.getOrDefault("content-disposition", "");
-                String partName = extractParam(disposition, "name");
-                String filename = extractParam(disposition, "filename");
+                    // Skip CRLF after boundary
+                    raf.seek(pos);
+                    int b = raf.read(); pos++;
+                    if (b == '\r') { b = raf.read(); pos++; }
+                    if (b == '\n') { /* already advanced */ }
 
-                // Find next boundary to determine part body end
-                int nextBoundary = dataStr.indexOf(fullBoundary, pos);
-                int bodyEnd;
-                if (nextBoundary >= 0) {
-                    // Body ends before \r\n preceding the boundary
-                    bodyEnd = nextBoundary;
-                    if (bodyEnd >= 2 && dataStr.charAt(bodyEnd - 2) == '\r' && dataStr.charAt(bodyEnd - 1) == '\n') {
-                        bodyEnd -= 2;
+                    // Parse part headers
+                    raf.seek(pos);
+                    Map<String, String> partHeaders = new HashMap<>();
+                    String headerLine;
+                    while ((headerLine = rafReadLine(raf)) != null) {
+                        if (headerLine.isEmpty()) break;
+                        int ci = headerLine.indexOf(':');
+                        if (ci > 0) {
+                            partHeaders.put(
+                                    headerLine.substring(0, ci).trim().toLowerCase(),
+                                    headerLine.substring(ci + 1).trim());
+                        }
                     }
-                } else {
-                    bodyEnd = dataStr.length();
-                }
+                    long bodyStart = raf.getFilePointer();
 
-                // Extract body bytes (use ISO_8859_1 to preserve binary data)
-                byte[] partBodyBytes = dataStr.substring(pos, bodyEnd).getBytes(StandardCharsets.ISO_8859_1);
+                    String disposition = partHeaders.getOrDefault("content-disposition", "");
+                    String partName = extractParam(disposition, "name");
+                    String filename = extractParam(disposition, "filename");
 
-                if (filename != null && !filename.isEmpty()) {
-                    // File upload - save to temp file
-                    File tmpFile = File.createTempFile("upload-", ".tmp");
-                    tmpFile.deleteOnExit();
-                    try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
-                        fos.write(partBodyBytes);
+                    // Find next boundary
+                    long nextBoundary = findBytes(raf, fullBoundary, bodyStart);
+                    long bodyEnd = nextBoundary >= 0 ? nextBoundary : fileLen;
+                    // Remove trailing \r\n before boundary
+                    if (bodyEnd >= bodyStart + 2) {
+                        raf.seek(bodyEnd - 2);
+                        int cr = raf.read(), lf = raf.read();
+                        if (cr == '\r' && lf == '\n') bodyEnd -= 2;
                     }
-                    String key = partName != null ? partName : "file";
-                    files.put(key, tmpFile.getAbsolutePath());
-                    multipartFiles.put(key, tmpFile.getAbsolutePath());
+                    long bodyLen = bodyEnd - bodyStart;
 
-                    // Store filename
-                    List<String> headerList = new ArrayList<>();
-                    headerList.add(filename);
-                    multipartHeaders.put(key, headerList);
-                } else if (partName != null) {
-                    parms.put(partName, new String(partBodyBytes, StandardCharsets.UTF_8));
+                    if (filename != null && !filename.isEmpty()) {
+                        // Stream part body to a temp file (no large in-memory allocation)
+                        File tmpFile = File.createTempFile("upload-", ".tmp");
+                        tmpFile.deleteOnExit();
+                        raf.seek(bodyStart);
+                        try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
+                            byte[] buf = new byte[65536];
+                            long remaining = bodyLen;
+                            while (remaining > 0) {
+                                int toRead = (int) Math.min(buf.length, remaining);
+                                int read = raf.read(buf, 0, toRead);
+                                if (read <= 0) break;
+                                fos.write(buf, 0, read);
+                                remaining -= read;
+                            }
+                        }
+                        String key = partName != null ? partName : "file";
+                        files.put(key, tmpFile.getAbsolutePath());
+                        multipartFiles.put(key, tmpFile.getAbsolutePath());
+                        List<String> headerList = new ArrayList<>();
+                        headerList.add(filename);
+                        multipartHeaders.put(key, headerList);
+                    } else if (partName != null && bodyLen < 10 * 1024 * 1024) {
+                        raf.seek(bodyStart);
+                        byte[] val = new byte[(int) bodyLen];
+                        raf.readFully(val);
+                        parms.put(partName, new String(val, StandardCharsets.UTF_8));
+                    }
+
+                    pos = nextBoundary;
+                }
+            } finally {
+                bodyFile.delete();
+            }
+        }
+
+        /** Read a line from RandomAccessFile (up to \n, stripping \r\n). */
+        private static String rafReadLine(RandomAccessFile raf) throws IOException {
+            StringBuilder sb = new StringBuilder();
+            int b;
+            while ((b = raf.read()) != -1) {
+                if (b == '\n') {
+                    if (sb.length() > 0 && sb.charAt(sb.length() - 1) == '\r')
+                        sb.setLength(sb.length() - 1);
+                    return sb.toString();
+                }
+                sb.append((char) b);
+            }
+            return sb.length() > 0 ? sb.toString() : null;
+        }
+
+        /** Find a byte pattern in a RandomAccessFile starting from pos. */
+        private static long findBytes(RandomAccessFile raf, byte[] pattern, long startPos) throws IOException {
+            raf.seek(startPos);
+            byte[] buf = new byte[65536];
+            long filePos = startPos;
+            int carry = 0;
+            byte[] window = new byte[buf.length + pattern.length];
+
+            while (true) {
+                int read = raf.read(buf);
+                if (read <= 0) return -1;
+                System.arraycopy(buf, 0, window, carry, read);
+                int windowLen = carry + read;
+
+                for (int i = 0; i <= windowLen - pattern.length; i++) {
+                    boolean match = true;
+                    for (int j = 0; j < pattern.length; j++) {
+                        if (window[i + j] != pattern[j]) { match = false; break; }
+                    }
+                    if (match) return filePos - carry + i;
                 }
 
-                // Advance to next boundary
-                pos = nextBoundary >= 0 ? nextBoundary : dataStr.length();
+                carry = Math.min(pattern.length - 1, windowLen);
+                System.arraycopy(window, windowLen - carry, window, 0, carry);
+                filePos += read;
             }
         }
 
