@@ -21,6 +21,7 @@
     <string name="max_upload_size">Max file size (MB)</string>
     <string name="enable_https">Enable HTTPS</string>
     <string name="no_files_found">No files found</string>
+    <string name="open_received_folder">Open Received Files</string>
     <string name="notification_channel_name">FileDroid Server</string>
     <string name="notification_channel_desc">Shows when the file server is running</string>
     <string name="server_notification_text">%1$s — %2$d client(s) connected</string>

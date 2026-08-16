@@ -1,13 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/tvHeader"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="horizontal"
     android:paddingHorizontal="12dp"
     android:paddingVertical="8dp"
-    android:textSize="13sp"
-    android:textStyle="bold"
-    android:textColor="@color/text_secondary"
-    tools:text="Today" />
+    android:gravity="center_vertical">
+
+    <CheckBox
+        android:id="@+id/cbSelectGroup"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="8dp"
+        android:buttonTint="@color/primary" />
+
+    <TextView
+        android:id="@+id/tvHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_secondary"
+        tools:text="Today" />
+
+    <TextView
+        android:id="@+id/tvCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        tools:text="5 items" />
+
+</LinearLayout>

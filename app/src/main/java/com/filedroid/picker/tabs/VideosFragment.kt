@@ -35,6 +35,10 @@ class VideosFragment : Fragment() {
             showDuration = true,
             onItemClick = { item -> viewModel.toggle(item.path) },
             onItemLongClick = { item -> openPreview(item) },
+            onGroupSelectToggle = { groupTitle, select ->
+                val paths = adapter.getGroupPaths(groupTitle)
+                if (select) viewModel.selectAll(paths) else viewModel.deselectAll(paths)
+            },
             isSelected = { path -> viewModel.isSelected(path) }
         )
 
@@ -50,7 +54,7 @@ class VideosFragment : Fragment() {
         binding.recyclerView.adapter = adapter
 
         viewModel.selectedPaths.observe(viewLifecycleOwner) {
-            adapter.notifyDataSetChanged()
+            adapter.notifySelectionChanged()
         }
 
         loadVideos()

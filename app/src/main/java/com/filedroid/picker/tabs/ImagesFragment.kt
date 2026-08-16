@@ -35,6 +35,10 @@ class ImagesFragment : Fragment() {
             showDuration = false,
             onItemClick = { item -> viewModel.toggle(item.path) },
             onItemLongClick = { item -> openPreview(item) },
+            onGroupSelectToggle = { groupTitle, select ->
+                val paths = adapter.getGroupPaths(groupTitle)
+                if (select) viewModel.selectAll(paths) else viewModel.deselectAll(paths)
+            },
             isSelected = { path -> viewModel.isSelected(path) }
         )
 
@@ -42,7 +46,7 @@ class ImagesFragment : Fragment() {
         val layoutManager = GridLayoutManager(requireContext(), spanCount)
         layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int {
-                return if (adapter.getItemViewType(position) == 0) spanCount else 1 // Header spans full width
+                return if (adapter.getItemViewType(position) == 0) spanCount else 1
             }
         }
 
@@ -50,7 +54,7 @@ class ImagesFragment : Fragment() {
         binding.recyclerView.adapter = adapter
 
         viewModel.selectedPaths.observe(viewLifecycleOwner) {
-            adapter.notifyDataSetChanged()
+            adapter.notifySelectionChanged()
         }
 
         loadImages()

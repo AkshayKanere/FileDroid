@@ -56,7 +56,7 @@ class DocumentsFragment : Fragment() {
         binding.recyclerView.adapter = adapter
 
         viewModel.selectedPaths.observe(viewLifecycleOwner) {
-            adapter.notifyDataSetChanged()
+            adapter.notifyDataSetChanged() // List adapter — no heavy thumbnails
         }
 
         loadDocuments()
