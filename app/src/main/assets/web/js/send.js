@@ -340,29 +340,16 @@
 
     async function downloadSelected() {
         if (selectedFiles.size === 0) return;
-        if (selectedFiles.size === 1) {
-            const path = Array.from(selectedFiles)[0];
-            const file = currentFiles.find(f => f.path === path);
-            if (file) downloadFile(file);
-            return;
-        }
-        try {
-            const res = await fetch('/api/download-zip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Array.from(selectedFiles))
-            });
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'FileDroid_download.zip';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            alert('Download failed: ' + e.message);
+        const paths = Array.from(selectedFiles);
+        // Download files sequentially with a small delay to avoid browser blocking
+        for (let i = 0; i < paths.length; i++) {
+            const file = currentFiles.find(f => f.path === paths[i]);
+            if (file && !isDir(file)) {
+                downloadFile(file);
+                if (i < paths.length - 1) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
         }
     }
 
