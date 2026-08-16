@@ -183,7 +183,7 @@ public abstract class NanoHTTPD {
         }
 
         HTTPSession(InputStream in, OutputStream out, InetAddress remoteAddr) {
-            this.inputStream = new BufferedInputStream(in, 8192);
+            this.inputStream = new BufferedInputStream(in, 131072); // 128KB input buffer
             this.outputStream = out;
             this.remoteAddr = remoteAddr;
         }
@@ -289,7 +289,7 @@ public abstract class NanoHTTPD {
             // Stream entire body to a temp file first to avoid OOM on large uploads
             File bodyFile = File.createTempFile("nanohttpd-multipart-", ".tmp");
             bodyFile.deleteOnExit();
-            try (FileOutputStream bodyOut = new FileOutputStream(bodyFile)) {
+            try (BufferedOutputStream bodyOut = new BufferedOutputStream(new FileOutputStream(bodyFile), 262144)) { // 256KB write buffer
                 copyStreamWithProgress(inputStream, bodyOut, contentLength, uploadProgressListener);
             }
 
