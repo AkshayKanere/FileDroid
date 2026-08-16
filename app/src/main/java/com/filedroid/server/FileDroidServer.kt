@@ -86,10 +86,10 @@ class FileDroidServer(
                 ByteArrayInputStream(bytes), bytes.size.toLong()
             )
 
-            // Cache static assets (not HTML)
-            if (!path.endsWith(".html")) {
-                response.addHeader("Cache-Control", "public, max-age=86400")
-            }
+            // No caching for any assets to ensure fresh content
+            response.addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
+            response.addHeader("Pragma", "no-cache")
+            response.addHeader("Expires", "0")
 
             response
         } catch (e: Exception) {

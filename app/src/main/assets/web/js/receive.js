@@ -75,7 +75,7 @@
             });
             renderUploadItem(uploadQueue[uploadQueue.length - 1]);
         }
-        updateCancelButton();
+        showCancelButton();
         if (!isUploading) processQueue();
     }
 
@@ -156,10 +156,18 @@
         updateCancelButton();
     }
 
+    function showCancelButton() {
+        const btn = document.getElementById('cancelAllBtn');
+        btn.style.display = '';
+        btn.disabled = false;
+    }
+
     function updateCancelButton() {
         const btn = document.getElementById('cancelAllBtn');
+        if (uploadQueue.length === 0) return;
+        btn.style.display = '';
         const hasActive = uploadQueue.some(e => e.status === 'pending' || e.status === 'uploading');
-        btn.style.display = hasActive ? '' : 'none';
+        btn.disabled = !hasActive;
     }
 
     // ---- UI ----

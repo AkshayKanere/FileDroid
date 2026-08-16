@@ -130,6 +130,7 @@ class TransferActivity : AppCompatActivity() {
         }
         binding.tvModeBadge.text = badgeText
 
+        binding.btnStop.text = if (mode == ServerMode.RECEIVE) "Stop Receiving" else getString(R.string.stop_sharing)
         binding.btnStop.setOnClickListener { stopAndFinish() }
 
         // Show "Open Folder" button only in receive mode
