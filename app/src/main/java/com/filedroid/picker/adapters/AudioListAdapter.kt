@@ -40,7 +40,6 @@ class AudioListAdapter(
         holder.binding.tvMeta.text = parts.joinToString(" • ")
 
         holder.binding.root.setOnClickListener { onItemClick(item) }
-        holder.binding.root.setOnLongClickListener { onItemLongClick?.invoke(item); true }
         holder.binding.checkbox.setOnClickListener { onItemClick(item) }
     }
 

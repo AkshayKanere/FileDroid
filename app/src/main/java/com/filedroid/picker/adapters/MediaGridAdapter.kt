@@ -214,9 +214,13 @@ class MediaGridAdapter(
                 }
             }
 
-            binding.root.setOnClickListener { onItemClick(item) }
-            binding.root.setOnLongClickListener { onItemLongClick?.invoke(item); true }
+            // Tap thumbnail = preview, tap anywhere else / checkbox = toggle selection
+            // No long-press — it interferes with scrolling on touch devices
+            binding.ivThumbnail.isClickable = true
+            binding.ivThumbnail.setOnClickListener { onItemLongClick?.invoke(item) }
             binding.checkbox.setOnClickListener { onItemClick(item) }
+            // Tap on info area or overlay = select
+            binding.root.setOnClickListener { onItemClick(item) }
         }
 
         fun updateSelection(item: MediaItem) {

@@ -42,7 +42,6 @@ class DocumentListAdapter(
         holder.binding.tvMeta.text = "$size • $date"
 
         holder.binding.root.setOnClickListener { onItemClick(item) }
-        holder.binding.root.setOnLongClickListener { onItemLongClick?.invoke(item); true }
         holder.binding.checkbox.setOnClickListener { onItemClick(item) }
     }
 
