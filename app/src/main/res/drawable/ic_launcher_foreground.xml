@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple folder + wifi icon for FileDroid -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,38h48c1.1,0 2,0.9 2,2v24c0,1.1 -0.9,2 -2,2H30c-1.1,0 -2,-0.9 -2,-2V40c0,-1.1 0.9,-2 2,-2z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,38l8,-6h12l4,6" />
+    <path
+        android:fillColor="#388E3C"
+        android:pathData="M54,48c-3.8,0 -7.2,1.6 -9.6,4.2l2.4,2.4c1.8,-1.8 4.4,-3 7.2,-3s5.4,1.2 7.2,3l2.4,-2.4C61.2,49.6 57.8,48 54,48z" />
+    <path
+        android:fillColor="#388E3C"
+        android:pathData="M54,54.4c-2.2,0 -4.2,0.9 -5.6,2.4l2.4,2.4c0.8,-0.8 2,-1.4 3.2,-1.4s2.4,0.6 3.2,1.4l2.4,-2.4C58.2,55.3 56.2,54.4 54,54.4z" />
+    <path
+        android:fillColor="#388E3C"
+        android:pathData="M54,59a2,2 0,1 0,0 4,2 2,0 0,0 0,-4z" />
+</vector>

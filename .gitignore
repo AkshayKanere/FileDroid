@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+.gradle_home/
+build/
+app/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Android
+*.apk
+*.aab
+*.dex
+*.class
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test_*.png
+test_*.jpg
+test_*.txt
