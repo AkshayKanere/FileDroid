@@ -506,7 +506,7 @@ public abstract class NanoHTTPD {
                 sb.append("Transfer-Encoding: chunked\r\n");
             }
 
-            sb.append("Connection: close\r\n");
+            sb.append("Connection: keep-alive\r\n");
 
             for (Map.Entry<String, String> h : headers.entrySet()) {
                 sb.append(h.getKey()).append(": ").append(h.getValue()).append("\r\n");
@@ -518,7 +518,7 @@ public abstract class NanoHTTPD {
             if (dataBytes != null) {
                 out.write(dataBytes);
             } else if (data != null) {
-                byte[] buf = new byte[8192];
+                byte[] buf = new byte[65536];
                 int read;
                 while ((read = data.read(buf)) != -1) {
                     if (isStreaming) {

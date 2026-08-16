@@ -326,14 +326,14 @@ class ApiHandler(
                 val rangeSpec = rangeHeader.removePrefix("bytes=").trim()
                 val parts = rangeSpec.split("-", limit = 2)
                 val start = parts[0].toLongOrNull() ?: 0L
+                // If browser specifies an end, honor it; otherwise serve to EOF
                 val end = if (parts.size > 1 && parts[1].isNotEmpty()) {
                     parts[1].toLongOrNull() ?: (fileLength - 1)
                 } else {
-                    // Serve a chunk at a time (2MB) to enable fast seeking
-                    minOf(start + 2 * 1024 * 1024 - 1, fileLength - 1)
+                    fileLength - 1
                 }
 
-                if (start >= fileLength || end >= fileLength || start > end) {
+                if (start >= fileLength || start > end) {
                     val err = NanoHTTPD.newFixedLengthResponse(
                         Response.Status.RANGE_NOT_SATISFIABLE, "text/plain", "Invalid range"
                     )
@@ -341,7 +341,8 @@ class ApiHandler(
                     return err
                 }
 
-                val contentLength = end - start + 1
+                val clampedEnd = minOf(end, fileLength - 1)
+                val contentLength = clampedEnd - start + 1
                 val fis = RandomAccessFile(file, "r")
                 fis.seek(start)
                 val limitedStream = BoundedInputStream(fis, contentLength)
@@ -349,7 +350,7 @@ class ApiHandler(
                 val response = NanoHTTPD.newFixedLengthResponse(
                     Response.Status.PARTIAL_CONTENT, mimeType, limitedStream, contentLength
                 )
-                response.addHeader("Content-Range", "bytes $start-$end/$fileLength")
+                response.addHeader("Content-Range", "bytes $start-$clampedEnd/$fileLength")
                 response.addHeader("Accept-Ranges", "bytes")
                 response.addHeader("Cache-Control", "public, max-age=3600")
                 return response
