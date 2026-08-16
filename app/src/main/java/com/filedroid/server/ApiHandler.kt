@@ -40,7 +40,7 @@ class ApiHandler(
             uri.startsWith("/api/download-zip") && method == Method.POST -> guardMode(ServerMode.SEND) { handleZipDownload(session, clientIp) }
             uri.startsWith("/api/download") -> guardMode(ServerMode.SEND) { handleDownload(params, session, clientIp) }
             uri.startsWith("/api/thumbnail") -> guardMode(ServerMode.SEND) { handleThumbnail(params) }
-            uri.startsWith("/api/preview") -> guardMode(ServerMode.SEND) { handlePreview(params) }
+            uri.startsWith("/api/preview") -> guardMode(ServerMode.SEND) { handlePreview(params, session) }
             uri.startsWith("/api/search") -> guardMode(ServerMode.SEND) { handleSearch(params) }
 
             // --- Receive mode endpoints (browser uploads to phone) ---
@@ -306,7 +306,7 @@ class ApiHandler(
         return response
     }
 
-    private fun handlePreview(params: Map<String, String>): Response {
+    private fun handlePreview(params: Map<String, String>, session: IHTTPSession): Response {
         val filePath = params["path"]
             ?: return jsonError(Response.Status.BAD_REQUEST, "Missing path")
 
@@ -317,13 +317,85 @@ class ApiHandler(
         if (!file.exists()) return jsonError(Response.Status.NOT_FOUND, "File not found")
 
         val mimeType = NanoHTTPD.getMimeType(file.name)
+        val fileLength = file.length()
+
+        // Handle Range requests for streaming video/audio
+        val rangeHeader = session.headers["range"]
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            try {
+                val rangeSpec = rangeHeader.removePrefix("bytes=").trim()
+                val parts = rangeSpec.split("-", limit = 2)
+                val start = parts[0].toLongOrNull() ?: 0L
+                val end = if (parts.size > 1 && parts[1].isNotEmpty()) {
+                    parts[1].toLongOrNull() ?: (fileLength - 1)
+                } else {
+                    // Serve a chunk at a time (2MB) to enable fast seeking
+                    minOf(start + 2 * 1024 * 1024 - 1, fileLength - 1)
+                }
+
+                if (start >= fileLength || end >= fileLength || start > end) {
+                    val err = NanoHTTPD.newFixedLengthResponse(
+                        Response.Status.RANGE_NOT_SATISFIABLE, "text/plain", "Invalid range"
+                    )
+                    err.addHeader("Content-Range", "bytes */$fileLength")
+                    return err
+                }
+
+                val contentLength = end - start + 1
+                val fis = RandomAccessFile(file, "r")
+                fis.seek(start)
+                val limitedStream = BoundedInputStream(fis, contentLength)
+
+                val response = NanoHTTPD.newFixedLengthResponse(
+                    Response.Status.PARTIAL_CONTENT, mimeType, limitedStream, contentLength
+                )
+                response.addHeader("Content-Range", "bytes $start-$end/$fileLength")
+                response.addHeader("Accept-Ranges", "bytes")
+                response.addHeader("Cache-Control", "public, max-age=3600")
+                return response
+            } catch (e: Exception) {
+                // Fall through to full-file response on parse error
+            }
+        }
+
+        // No Range header — serve full file
         val fis = FileInputStream(file)
         val response = NanoHTTPD.newFixedLengthResponse(
-            Response.Status.OK, mimeType, fis, file.length()
+            Response.Status.OK, mimeType, fis, fileLength
         )
         response.addHeader("Cache-Control", "public, max-age=3600")
         response.addHeader("Accept-Ranges", "bytes")
         return response
+    }
+
+    /**
+     * InputStream wrapper that reads exactly [limit] bytes from a RandomAccessFile,
+     * then closes the RAF when done.
+     */
+    private class BoundedInputStream(
+        private val raf: RandomAccessFile,
+        private val limit: Long
+    ) : InputStream() {
+        private var bytesRead: Long = 0
+
+        override fun read(): Int {
+            if (bytesRead >= limit) return -1
+            val b = raf.read()
+            if (b >= 0) bytesRead++
+            return b
+        }
+
+        override fun read(buf: ByteArray, off: Int, len: Int): Int {
+            if (bytesRead >= limit) return -1
+            val toRead = minOf(len.toLong(), limit - bytesRead).toInt()
+            val n = raf.read(buf, off, toRead)
+            if (n > 0) bytesRead += n
+            return n
+        }
+
+        override fun close() {
+            raf.close()
+        }
     }
 
     private fun handleSearch(params: Map<String, String>): Response {

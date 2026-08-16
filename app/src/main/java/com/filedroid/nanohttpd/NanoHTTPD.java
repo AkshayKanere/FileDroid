@@ -551,6 +551,7 @@ public abstract class NanoHTTPD {
             FORBIDDEN(403, "403 Forbidden"),
             NOT_FOUND(404, "404 Not Found"),
             METHOD_NOT_ALLOWED(405, "405 Method Not Allowed"),
+            RANGE_NOT_SATISFIABLE(416, "416 Range Not Satisfiable"),
             REQUEST_ENTITY_TOO_LARGE(413, "413 Request Entity Too Large"),
             TOO_MANY_REQUESTS(429, "429 Too Many Requests"),
             INTERNAL_ERROR(500, "500 Internal Server Error");
