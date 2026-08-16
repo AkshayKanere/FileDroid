@@ -36,15 +36,17 @@ class FileDroidServer(
         val uri = session.uri
         val clientIp = session.remoteIpAddress
 
-        // Rate limiting
-        if (security.isRequestRateLimited(clientIp)) {
-            return newFixedLengthResponse(
-                Response.Status.TOO_MANY_REQUESTS,
-                "application/json",
-                """{"error":"Rate limit exceeded"}"""
-            )
+        // Rate limiting (only for API endpoints, not static assets)
+        if (uri.startsWith("/api/")) {
+            if (security.isRequestRateLimited(clientIp)) {
+                return newFixedLengthResponse(
+                    Response.Status.TOO_MANY_REQUESTS,
+                    "application/json",
+                    """{"error":"Rate limit exceeded"}"""
+                )
+            }
+            security.recordRequest(clientIp)
         }
-        security.recordRequest(clientIp)
 
         // Handle CORS preflight
         if (session.method == Method.OPTIONS) {

@@ -13,7 +13,7 @@ class SecurityManager(private val config: ServerConfig) {
     private val connectedClients = ConcurrentHashMap<String, Long>()
 
     companion object {
-        private const val MAX_REQUESTS_PER_MINUTE = 200
+        private const val MAX_REQUESTS_PER_MINUTE = 600
     }
 
     fun isRequestRateLimited(ip: String): Boolean {
