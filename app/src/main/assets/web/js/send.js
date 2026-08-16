@@ -27,6 +27,10 @@
         document.getElementById('selectAll').addEventListener('change', handleSelectAll);
         document.getElementById('downloadSelected').addEventListener('click', downloadSelected);
         document.getElementById('downloadZip').addEventListener('click', downloadAsZip);
+        document.getElementById('downloadPanelClose').addEventListener('click', () => {
+            document.getElementById('downloadPanel').style.display = 'none';
+            document.getElementById('downloadList').innerHTML = '';
+        });
         document.getElementById('closePreview').addEventListener('click', closePreview);
         document.getElementById('toggleView').addEventListener('click', toggleViewMode);
         document.getElementById('selectAllBtn').addEventListener('click', toggleSelectAll);
@@ -330,7 +334,14 @@
 
     // ---- Downloads ----
 
+    // ---- Download Queue ----
+
+    let downloadQueue = [];
+    let isDownloading = false;
+    let dlCompleted = 0, dlFailed = 0, dlTotalBytes = 0;
+
     function downloadFile(file) {
+        // Single file — direct browser download
         const a = document.createElement('a');
         a.href = `/api/download?path=${encodeURIComponent(file.path)}`;
         a.download = file.name;
@@ -339,24 +350,168 @@
         document.body.removeChild(a);
     }
 
-    async function downloadSelected() {
+    function downloadSelected() {
         if (selectedFiles.size === 0) return;
+        if (selectedFiles.size === 1) {
+            const path = Array.from(selectedFiles)[0];
+            const file = currentFiles.find(f => f.path === path);
+            if (file) downloadFile(file);
+            return;
+        }
+        // Multi-file: show download queue panel
+        const panel = document.getElementById('downloadPanel');
+        const list = document.getElementById('downloadList');
+        panel.style.display = '';
+        dlCompleted = 0; dlFailed = 0; dlTotalBytes = 0;
+        downloadQueue = [];
+        document.getElementById('downloadSummary').style.display = 'none';
+
         const paths = Array.from(selectedFiles);
-        for (let i = 0; i < paths.length; i++) {
-            const file = currentFiles.find(f => f.path === paths[i]);
+        for (const path of paths) {
+            const file = currentFiles.find(f => f.path === path);
             if (file && !isDir(file)) {
-                downloadFile(file);
-                if (i < paths.length - 1) {
-                    await new Promise(r => setTimeout(r, 500));
-                }
+                const id = 'dl_' + Math.random().toString(36).substr(2, 9);
+                const entry = { id, file, status: 'pending', progress: 0, speed: 0, xhr: null };
+                downloadQueue.push(entry);
+                renderDownloadItem(entry);
             }
         }
+        if (!isDownloading) processDownloadQueue();
+    }
+
+    async function processDownloadQueue() {
+        isDownloading = true;
+        while (true) {
+            const entry = downloadQueue.find(e => e.status === 'pending');
+            if (!entry) break;
+            entry.status = 'downloading';
+            updateDownloadItem(entry);
+            try {
+                await downloadWithProgress(entry);
+                entry.status = 'done';
+                entry.progress = 100;
+                dlCompleted++;
+                dlTotalBytes += entry.file.size;
+            } catch (e) {
+                entry.status = 'error';
+                dlFailed++;
+            }
+            updateDownloadItem(entry);
+        }
+        isDownloading = false;
+        updateDownloadSummary();
+    }
+
+    function downloadWithProgress(entry) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            entry.xhr = xhr;
+            xhr.responseType = 'blob';
+            const startTime = Date.now();
+
+            xhr.addEventListener('progress', e => {
+                if (e.lengthComputable) {
+                    entry.progress = Math.round((e.loaded / e.total) * 100);
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    entry.speed = elapsed > 0 ? e.loaded / elapsed : 0;
+                    updateDownloadItem(entry);
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                entry.xhr = null;
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    // Save the blob
+                    const url = URL.createObjectURL(xhr.response);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = entry.file.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    resolve();
+                } else {
+                    reject(new Error('HTTP ' + xhr.status));
+                }
+            });
+            xhr.addEventListener('error', () => { entry.xhr = null; reject(new Error('Network error')); });
+            xhr.addEventListener('abort', () => { entry.xhr = null; reject(new Error('Cancelled')); });
+
+            xhr.open('GET', `/api/download?path=${encodeURIComponent(entry.file.path)}`);
+            xhr.send();
+        });
+    }
+
+    function renderDownloadItem(entry) {
+        const list = document.getElementById('downloadList');
+        const div = document.createElement('div');
+        div.id = entry.id;
+        div.className = 'upload-item';
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'upload-item-header';
+        headerDiv.innerHTML = `<span class="upload-item-icon">${getFileIcon(entry.file)}</span>
+            <span class="upload-item-name">${escapeHtml(entry.file.name)}</span>
+            <span class="upload-item-size">${formatBytes(entry.file.size)}</span>`;
+        div.appendChild(headerDiv);
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'upload-item-progress';
+        const bar = document.createElement('div');
+        bar.className = 'progress-bar';
+        const fill = document.createElement('div');
+        fill.className = 'progress-bar-fill';
+        fill.style.width = '0%';
+        bar.appendChild(fill);
+        const status = document.createElement('span');
+        status.className = 'upload-item-status';
+        status.textContent = 'Waiting...';
+        progressDiv.appendChild(bar);
+        progressDiv.appendChild(status);
+        div.appendChild(progressDiv);
+        list.appendChild(div);
+    }
+
+    function updateDownloadItem(entry) {
+        const div = document.getElementById(entry.id);
+        if (!div) return;
+        const fill = div.querySelector('.progress-bar-fill');
+        const status = div.querySelector('.upload-item-status');
+        switch (entry.status) {
+            case 'downloading':
+                div.className = 'upload-item active';
+                fill.style.width = entry.progress + '%';
+                status.textContent = `${entry.progress}% \u2022 ${formatBytes(entry.speed)}/s`;
+                div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                break;
+            case 'done':
+                div.className = 'upload-item completed';
+                fill.className = 'progress-bar-fill success';
+                fill.style.width = '100%';
+                status.textContent = '\u2705 Downloaded';
+                status.className = 'upload-item-status success';
+                break;
+            case 'error':
+                div.className = 'upload-item completed';
+                fill.className = 'progress-bar-fill error';
+                status.textContent = '\u274c Failed';
+                status.className = 'upload-item-status error';
+                break;
+            default:
+                status.textContent = 'Waiting...';
+        }
+    }
+
+    function updateDownloadSummary() {
+        const el = document.getElementById('downloadSummary');
+        const text = document.getElementById('downloadSummaryText');
+        el.style.display = 'block';
+        let msg = `\u2705 ${dlCompleted} downloaded (${formatBytes(dlTotalBytes)})`;
+        if (dlFailed > 0) msg += ` \u2022 \u274c ${dlFailed} failed`;
+        text.textContent = msg;
     }
 
     function downloadAsZip() {
         if (selectedFiles.size === 0) return;
-        // Use a hidden form POST — browser handles the streaming download natively
-        // (no blob in memory, shows progress in download manager)
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/api/download-zip';
