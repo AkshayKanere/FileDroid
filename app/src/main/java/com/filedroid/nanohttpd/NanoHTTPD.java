@@ -339,8 +339,18 @@ public abstract class NanoHTTPD {
                     String partName = extractParam(disposition, "name");
                     String filename = extractParam(disposition, "filename");
 
-                    // Find next boundary
-                    long nextBoundary = findBytes(raf, fullBoundary, bodyStart);
+                    // Find next boundary — search backwards from end for large file parts
+                    // (single-file uploads have the closing boundary near the very end)
+                    long nextBoundary;
+                    long searchHint = fileLen - fullBoundary.length - 64; // closing boundary is near EOF
+                    if (searchHint > bodyStart) {
+                        nextBoundary = findBytes(raf, fullBoundary, searchHint);
+                        if (nextBoundary < 0) {
+                            nextBoundary = findBytes(raf, fullBoundary, bodyStart);
+                        }
+                    } else {
+                        nextBoundary = findBytes(raf, fullBoundary, bodyStart);
+                    }
                     long bodyEnd = nextBoundary >= 0 ? nextBoundary : fileLen;
                     // Remove trailing \r\n before boundary
                     if (bodyEnd >= bodyStart + 2) {
@@ -351,18 +361,18 @@ public abstract class NanoHTTPD {
                     long bodyLen = bodyEnd - bodyStart;
 
                     if (filename != null && !filename.isEmpty()) {
-                        // Stream part body to a temp file (no large in-memory allocation)
+                        // Stream part body to a temp file with large buffers for speed
                         File tmpFile = File.createTempFile("upload-", ".tmp");
                         tmpFile.deleteOnExit();
                         raf.seek(bodyStart);
-                        try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
-                            byte[] buf = new byte[65536];
+                        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmpFile), 262144)) {
+                            byte[] buf = new byte[131072]; // 128KB read buffer
                             long remaining = bodyLen;
                             while (remaining > 0) {
                                 int toRead = (int) Math.min(buf.length, remaining);
                                 int read = raf.read(buf, 0, toRead);
                                 if (read <= 0) break;
-                                fos.write(buf, 0, read);
+                                bos.write(buf, 0, read);
                                 remaining -= read;
                             }
                         }

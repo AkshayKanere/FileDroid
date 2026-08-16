@@ -516,8 +516,16 @@ class ApiHandler(
                 // Update the transfer entry with the real filename
                 TransferProgressManager.updateFileName(uploadTransferId, safeName)
 
-                tmpFile.copyTo(destFile, overwrite = true)
-                tmpFile.delete()
+                // Try instant rename first (same filesystem = zero-copy)
+                if (!tmpFile.renameTo(destFile)) {
+                    // Cross-filesystem: buffered copy with 128KB buffer
+                    tmpFile.inputStream().buffered(131072).use { input ->
+                        destFile.outputStream().buffered(131072).use { output ->
+                            input.copyTo(output, 131072)
+                        }
+                    }
+                    tmpFile.delete()
+                }
                 uploadedFiles.add(safeName)
 
                 transferLogger.onTransfer(TransferLogEntry(
