@@ -114,6 +114,7 @@ public abstract class NanoHTTPD {
         @Override
         public void run() {
             try {
+                socket.setSoTimeout(30000); // 30s read timeout to prevent hung connections
                 InputStream in = socket.getInputStream();
                 OutputStream out = socket.getOutputStream();
                 HTTPSession session = new HTTPSession(in, out, socket.getInetAddress());
@@ -506,7 +507,7 @@ public abstract class NanoHTTPD {
                 sb.append("Transfer-Encoding: chunked\r\n");
             }
 
-            sb.append("Connection: keep-alive\r\n");
+            sb.append("Connection: close\r\n");
 
             for (Map.Entry<String, String> h : headers.entrySet()) {
                 sb.append(h.getKey()).append(": ").append(h.getValue()).append("\r\n");
@@ -518,22 +519,27 @@ public abstract class NanoHTTPD {
             if (dataBytes != null) {
                 out.write(dataBytes);
             } else if (data != null) {
-                byte[] buf = new byte[65536];
-                int read;
-                while ((read = data.read(buf)) != -1) {
-                    if (isStreaming) {
-                        out.write(Integer.toHexString(read).getBytes());
-                        out.write("\r\n".getBytes());
-                        out.write(buf, 0, read);
-                        out.write("\r\n".getBytes());
-                    } else {
-                        out.write(buf, 0, read);
+                try {
+                    byte[] buf = new byte[65536];
+                    int read;
+                    while ((read = data.read(buf)) != -1) {
+                        if (isStreaming) {
+                            out.write(Integer.toHexString(read).getBytes());
+                            out.write("\r\n".getBytes());
+                            out.write(buf, 0, read);
+                            out.write("\r\n".getBytes());
+                        } else {
+                            out.write(buf, 0, read);
+                        }
                     }
+                    if (isStreaming) {
+                        out.write("0\r\n\r\n".getBytes());
+                    }
+                } finally {
+                    // Always close the input stream (e.g. RandomAccessFile)
+                    // even if the client disconnects mid-transfer (broken pipe)
+                    try { data.close(); } catch (IOException ignore) {}
                 }
-                if (isStreaming) {
-                    out.write("0\r\n\r\n".getBytes());
-                }
-                data.close();
             }
 
             out.flush();
