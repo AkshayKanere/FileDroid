@@ -29,8 +29,8 @@
         <!-- Breadcrumbs -->
         <nav id="breadcrumbs" class="breadcrumbs"></nav>
 
-        <!-- Toolbar -->
-        <div id="toolbar" class="toolbar" style="display:none">
+        <!-- Toolbar (always visible floating footer) -->
+        <div id="toolbar" class="toolbar toolbar-disabled">
             <div class="toolbar-left">
                 <label class="select-all-label">
                     <input type="checkbox" id="selectAll">
@@ -38,7 +38,7 @@
                 </label>
             </div>
             <div class="toolbar-right">
-                <button id="downloadSelected" class="btn btn-sm">⬇️ Download Selected</button>
+                <button id="downloadSelected" class="btn btn-sm" disabled>⬇️ Download Selected</button>
             </div>
         </div>
 

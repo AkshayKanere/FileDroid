@@ -322,9 +322,16 @@
 
     function updateToolbar() {
         const toolbar = document.getElementById('toolbar');
+        const btn = document.getElementById('downloadSelected');
         const count = selectedFiles.size;
-        toolbar.style.display = count > 0 ? 'flex' : 'none';
-        document.getElementById('selectedCount').textContent = `${count} selected`;
+        if (count > 0) {
+            toolbar.classList.remove('toolbar-disabled');
+            btn.disabled = false;
+        } else {
+            toolbar.classList.add('toolbar-disabled');
+            btn.disabled = true;
+        }
+        document.getElementById('selectedCount').textContent = count > 0 ? `${count} selected` : 'No files selected';
     }
 
     // ---- Downloads ----
