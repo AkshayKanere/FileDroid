@@ -26,6 +26,7 @@
         document.getElementById('searchBtn').addEventListener('click', handleSearch);
         document.getElementById('selectAll').addEventListener('change', handleSelectAll);
         document.getElementById('downloadSelected').addEventListener('click', downloadSelected);
+        document.getElementById('downloadZip').addEventListener('click', downloadAsZip);
         document.getElementById('closePreview').addEventListener('click', closePreview);
         document.getElementById('toggleView').addEventListener('click', toggleViewMode);
         document.getElementById('selectAllBtn').addEventListener('click', toggleSelectAll);
@@ -341,7 +342,6 @@
     async function downloadSelected() {
         if (selectedFiles.size === 0) return;
         const paths = Array.from(selectedFiles);
-        // Download files sequentially with a small delay to avoid browser blocking
         for (let i = 0; i < paths.length; i++) {
             const file = currentFiles.find(f => f.path === paths[i]);
             if (file && !isDir(file)) {
@@ -350,6 +350,35 @@
                     await new Promise(r => setTimeout(r, 500));
                 }
             }
+        }
+    }
+
+    async function downloadAsZip() {
+        if (selectedFiles.size === 0) return;
+        const btn = document.getElementById('downloadZip');
+        btn.disabled = true;
+        btn.textContent = '⏳ Zipping...';
+        try {
+            const res = await fetch('/api/download-zip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Array.from(selectedFiles))
+            });
+            if (!res.ok) throw new Error('Server error ' + res.status);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'FileDroid_download.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert('ZIP download failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '📦 Download ZIP';
         }
     }
 

@@ -203,7 +203,10 @@ class ApiHandler(
             return jsonError(Response.Status.BAD_REQUEST, "Invalid request body")
         }
 
-        val pathsJson = session.parms["paths"] ?: files["postData"]
+        // The JSON body may be in parms, postData, or saved to a temp file
+        val pathsJson = session.parms["paths"]
+            ?: files["postData"]
+            ?: files["content"]?.let { path -> try { File(path).readText() } catch (_: Exception) { null } }
             ?: return jsonError(Response.Status.BAD_REQUEST, "Missing paths")
 
         val paths: List<String> = try {
@@ -228,23 +231,27 @@ class ApiHandler(
         TransferProgressManager.startTransfer(transferId, "FileDroid_download.zip (${validFiles.size} files)", totalSize)
 
         val pipedOutputStream = PipedOutputStream()
-        val pipedInputStream = PipedInputStream(pipedOutputStream, 65536)
+        val pipedInputStream = PipedInputStream(pipedOutputStream, 1024 * 1024) // 1MB buffer
 
-        Thread {
+        Thread({
             try {
-                ZipOutputStream(BufferedOutputStream(pipedOutputStream)).use { zos ->
+                ZipOutputStream(BufferedOutputStream(pipedOutputStream, 65536)).use { zos ->
+                    zos.setLevel(0) // STORE only, no compression — much faster for media files
                     for (file in validFiles) {
                         addToZip(zos, file, file.name)
                     }
                 }
                 TransferProgressManager.completeTransfer(transferId)
+            } catch (e: java.io.IOException) {
+                // Broken pipe = client disconnected, normal
+                TransferProgressManager.failTransfer(transferId)
             } catch (e: Exception) {
                 e.printStackTrace()
                 TransferProgressManager.failTransfer(transferId)
             } finally {
-                try { pipedOutputStream.close() } catch (ignore: Exception) {}
+                try { pipedOutputStream.close() } catch (_: Exception) {}
             }
-        }.start()
+        }, "zip-writer-${transferId.take(8)}").apply { isDaemon = true }.start()
 
         transferLogger.onTransfer(TransferLogEntry(
             fileName = "batch_download.zip (${validFiles.size} files)",
