@@ -139,10 +139,10 @@ class TransferActivity : AppCompatActivity() {
         binding.btnStop.text = if (mode == ServerMode.RECEIVE) getString(R.string.stop_receiving) else getString(R.string.stop_sharing)
         binding.btnStop.setOnClickListener { confirmStop() }
 
-        // Show "Open Folder" button only in receive mode
+        // Show "Open Folder" button always visible in receive mode
         if (mode == ServerMode.RECEIVE) {
+            binding.btnOpenFolder.visibility = android.view.View.VISIBLE
             binding.btnOpenFolder.setOnClickListener { openReceivedFolder() }
-            // Initially hidden, shown after first file received
         }
     }
 
