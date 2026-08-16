@@ -36,12 +36,16 @@ class MediaGridAdapter(
     }
 
     private val items = mutableListOf<ListItem>()
-    private val thumbExecutor = Executors.newFixedThreadPool(4)
-    // LruCache for thumbnails — 40MB for smooth scrolling without blanks
-    private val thumbCache = object : android.util.LruCache<String, Bitmap>(
-        40 * 1024 * 1024  // 40 MB
-    ) {
-        override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount
+    private val thumbExecutor = Executors.newFixedThreadPool(2) // 2 threads to reduce CPU pressure
+    @Volatile var isScrolling = false  // Pause thumb loading during flings
+
+    // Scale cache to device memory — use 1/8th of max heap
+    private val thumbCache: android.util.LruCache<String, Bitmap> = run {
+        val maxMem = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+        val cacheSize = (maxMem / 8) * 1024  // 1/8th of max heap in bytes
+        object : android.util.LruCache<String, Bitmap>(cacheSize) {
+            override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount
+        }
     }
 
     fun submitItems(mediaItems: List<MediaItem>) {
@@ -194,7 +198,8 @@ class MediaGridAdapter(
                 // Show a light gray placeholder while loading (not blank)
                 binding.ivThumbnail.setImageDrawable(null)
                 binding.ivThumbnail.setBackgroundColor(0xFFE0E0E0.toInt())
-                if (!thumbExecutor.isShutdown) {
+                // Skip loading during fast fling to reduce CPU/jank
+                if (!thumbExecutor.isShutdown && !isScrolling) {
                     thumbExecutor.execute {
                         try {
                             val bitmap = loadThumbnail(item)

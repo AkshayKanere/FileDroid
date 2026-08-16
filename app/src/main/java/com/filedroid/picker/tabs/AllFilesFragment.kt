@@ -40,8 +40,9 @@ class AllFilesFragment : Fragment() {
                     currentDir = file
                     loadDirectory()
                 } else {
+                    val pos = adapter.indexOf(file)
                     viewModel.toggle(file.absolutePath)
-                    adapter.notifyDataSetChanged()
+                    if (pos >= 0) adapter.notifyItemChanged(pos) else adapter.notifyDataSetChanged()
                 }
             },
             isSelected = { path -> viewModel.isSelected(path) }
@@ -51,7 +52,10 @@ class AllFilesFragment : Fragment() {
         binding.recyclerView.adapter = adapter
 
         viewModel.selectedPaths.observe(viewLifecycleOwner) {
-            adapter.notifyDataSetChanged()
+            // Efficient partial update instead of full redraw
+            for (i in 0 until adapter.itemCount) {
+                adapter.notifyItemChanged(i, "selection")
+            }
         }
 
         loadDirectory()
@@ -95,6 +99,8 @@ class AllFilesFragment : Fragment() {
             files.addAll(list)
             notifyDataSetChanged()
         }
+
+        fun indexOf(file: File): Int = files.indexOfFirst { it.absolutePath == file.absolutePath }
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val checkbox: CheckBox = view.findViewById(R.id.checkbox)

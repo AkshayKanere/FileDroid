@@ -53,6 +53,13 @@ class VideosFragment : Fragment() {
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = adapter
 
+        // Pause thumbnail loading during fast fling to reduce jank
+        binding.recyclerView.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: androidx.recyclerview.widget.RecyclerView, newState: Int) {
+                adapter.isScrolling = newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_SETTLING
+            }
+        })
+
         viewModel.selectedPaths.observe(viewLifecycleOwner) {
             adapter.notifySelectionChanged()
         }

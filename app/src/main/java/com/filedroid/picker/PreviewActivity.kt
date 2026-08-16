@@ -6,7 +6,11 @@ import android.os.Bundle
 import android.view.View
 import android.widget.MediaController
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.filedroid.databinding.ActivityPreviewBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class PreviewActivity : AppCompatActivity() {
@@ -30,14 +34,18 @@ class PreviewActivity : AppCompatActivity() {
         when {
             mime.startsWith("image/") -> {
                 binding.ivPreview.visibility = View.VISIBLE
-                // Downsample large images to avoid OOM
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(path, opts)
-                var sample = 1
-                val maxDim = 2048
-                while (opts.outWidth / sample > maxDim || opts.outHeight / sample > maxDim) sample *= 2
-                val bmp = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
-                if (bmp != null) binding.ivPreview.setImageBitmap(bmp) else binding.ivPreview.setImageURI(uri)
+                // Decode off main thread to avoid UI freeze
+                lifecycleScope.launch {
+                    val bmp = withContext(Dispatchers.IO) {
+                        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(path, opts)
+                        var sample = 1
+                        val maxDim = 2048
+                        while (opts.outWidth / sample > maxDim || opts.outHeight / sample > maxDim) sample *= 2
+                        BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+                    }
+                    if (bmp != null) binding.ivPreview.setImageBitmap(bmp) else binding.ivPreview.setImageURI(uri)
+                }
             }
             mime.startsWith("video/") -> {
                 binding.videoPreview.visibility = View.VISIBLE
