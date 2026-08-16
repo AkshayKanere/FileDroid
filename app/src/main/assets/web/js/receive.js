@@ -214,22 +214,27 @@
 
         switch (entry.status) {
             case 'uploading':
+                div.className = 'upload-item active';
                 fill.className = 'progress-bar-fill';
                 status.textContent = `${entry.progress}% \u2022 ${formatBytes(entry.speed)}/s`;
                 status.className = 'upload-item-status';
+                div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 break;
             case 'done':
+                div.className = 'upload-item completed';
                 fill.className = 'progress-bar-fill success';
                 fill.style.width = '100%';
                 status.textContent = '\u2705 Sent';
                 status.className = 'upload-item-status success';
                 break;
             case 'error':
+                div.className = 'upload-item completed';
                 fill.className = 'progress-bar-fill error';
                 status.textContent = '\u274C ' + (entry.error || 'Failed');
                 status.className = 'upload-item-status error';
                 break;
             case 'cancelled':
+                div.className = 'upload-item completed';
                 fill.className = 'progress-bar-fill';
                 fill.style.width = '0%';
                 status.textContent = '\u26D4 Cancelled';
