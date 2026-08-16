@@ -60,7 +60,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .crumb-sep { color: var(--text-secondary); font-size: 12px; flex-shrink: 0; }
 
 /* ========== Sort Bar ========== */
-.sort-bar { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--divider); font-size: 13px; }
+.sort-bar { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--divider); font-size: 13px; flex-wrap: wrap; }
+.btn-select-all { margin-left: auto; background: var(--accent); color: #fff; border: none; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.btn-select-all:hover { background: var(--primary-dark); }
 .sort-label { color: var(--text-secondary); }
 .sort-btn { background: none; border: 1px solid var(--divider); padding: 3px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
 .sort-btn.active { background: var(--primary); color: white; border-color: var(--primary); }

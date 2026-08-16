@@ -143,6 +143,11 @@ public abstract class NanoHTTPD {
         }
     }
 
+    /** Callback for tracking upload progress during multipart parsing. */
+    public interface UploadProgressListener {
+        void onProgress(long bytesRead, long totalBytes);
+    }
+
     public interface IHTTPSession {
         Method getMethod();
         String getUri();
@@ -153,6 +158,7 @@ public abstract class NanoHTTPD {
         Map<String, List<String>> getMultipartHeaders();
         Map<String, String> getMultipartFiles();
         void parseBody(Map<String, String> files) throws IOException, ResponseException;
+        void setUploadProgressListener(UploadProgressListener listener);
     }
 
     private class HTTPSession implements IHTTPSession {
@@ -168,6 +174,12 @@ public abstract class NanoHTTPD {
         private String contentType;
         private Map<String, List<String>> multipartHeaders = new HashMap<>();
         private Map<String, String> multipartFiles = new HashMap<>();
+        private UploadProgressListener uploadProgressListener;
+
+        @Override
+        public void setUploadProgressListener(UploadProgressListener listener) {
+            this.uploadProgressListener = listener;
+        }
 
         HTTPSession(InputStream in, OutputStream out, InetAddress remoteAddr) {
             this.inputStream = new BufferedInputStream(in, 8192);
@@ -277,7 +289,7 @@ public abstract class NanoHTTPD {
             File bodyFile = File.createTempFile("nanohttpd-multipart-", ".tmp");
             bodyFile.deleteOnExit();
             try (FileOutputStream bodyOut = new FileOutputStream(bodyFile)) {
-                copyStream(inputStream, bodyOut, contentLength);
+                copyStreamWithProgress(inputStream, bodyOut, contentLength, uploadProgressListener);
             }
 
             byte[] fullBoundary = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
@@ -626,6 +638,22 @@ public abstract class NanoHTTPD {
         while (total < maxBytes && (read = in.read(buf, 0, (int) Math.min(buf.length, maxBytes - total))) != -1) {
             out.write(buf, 0, read);
             total += read;
+        }
+    }
+
+    protected static void copyStreamWithProgress(InputStream in, OutputStream out, long maxBytes,
+                                                  UploadProgressListener listener) throws IOException {
+        byte[] buf = new byte[65536];
+        long total = 0;
+        long lastReport = 0;
+        int read;
+        while (total < maxBytes && (read = in.read(buf, 0, (int) Math.min(buf.length, maxBytes - total))) != -1) {
+            out.write(buf, 0, read);
+            total += read;
+            if (listener != null && (total - lastReport >= 65536 || total >= maxBytes)) {
+                lastReport = total;
+                listener.onProgress(total, maxBytes);
+            }
         }
     }
 

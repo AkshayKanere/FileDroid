@@ -12,7 +12,7 @@ object TransferProgressManager {
 
     data class TransferEntry(
         val id: String,
-        val fileName: String,
+        var fileName: String,
         val totalBytes: Long,
         var transferredBytes: Long = 0L,
         var speedBytesPerSec: Long = 0L,
@@ -47,6 +47,12 @@ object TransferProgressManager {
         activeTransfers[id] = entry
         listeners.forEach { it.onProgressUpdate(entry) }
         return entry
+    }
+
+    fun updateFileName(id: String, newName: String) {
+        val entry = activeTransfers[id] ?: return
+        entry.fileName = newName
+        listeners.forEach { it.onProgressUpdate(entry) }
     }
 
     fun updateProgress(id: String, transferredBytes: Long) {

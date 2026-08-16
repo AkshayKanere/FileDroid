@@ -28,6 +28,7 @@
         document.getElementById('downloadSelected').addEventListener('click', downloadSelected);
         document.getElementById('closePreview').addEventListener('click', closePreview);
         document.getElementById('toggleView').addEventListener('click', toggleViewMode);
+        document.getElementById('selectAllBtn').addEventListener('click', toggleSelectAll);
 
         document.querySelectorAll('.sort-btn').forEach(btn => {
             btn.addEventListener('click', () => setSortKey(btn.dataset.sort));
@@ -149,6 +150,7 @@
         [...dirs, ...regular].forEach(file => {
             container.appendChild(createFileItem(file));
         });
+        updateSelectAllBtn();
     }
 
     function createThumbEl(thumbUrl, icon) {
@@ -290,6 +292,32 @@
             if (cb) { cb.checked = checked; div.classList.toggle('selected', checked); }
         });
         updateToolbar();
+        updateSelectAllBtn();
+    }
+
+    function toggleSelectAll() {
+        const allFiles = currentFiles.filter(f => !isDir(f));
+        const allSelected = allFiles.length > 0 && allFiles.every(f => selectedFiles.has(f.path));
+        const checked = !allSelected;
+        allFiles.forEach(file => {
+            if (checked) selectedFiles.add(file.path);
+            else selectedFiles.delete(file.path);
+        });
+        document.querySelectorAll('.file-item').forEach(div => {
+            const cb = div.querySelector('.file-select');
+            if (cb) { cb.checked = checked; div.classList.toggle('selected', checked); }
+        });
+        const selectAllCb = document.getElementById('selectAll');
+        if (selectAllCb) selectAllCb.checked = checked;
+        updateToolbar();
+        updateSelectAllBtn();
+    }
+
+    function updateSelectAllBtn() {
+        const btn = document.getElementById('selectAllBtn');
+        const allFiles = currentFiles.filter(f => !isDir(f));
+        const allSelected = allFiles.length > 0 && allFiles.every(f => selectedFiles.has(f.path));
+        btn.textContent = allSelected ? '☐ Deselect All' : '☑ Select All';
     }
 
     function updateToolbar() {

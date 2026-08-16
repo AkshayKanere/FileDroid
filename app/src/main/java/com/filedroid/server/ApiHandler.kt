@@ -366,12 +366,25 @@ class ApiHandler(
             uploadDir.mkdirs()
         }
 
+        // Start tracking upload progress BEFORE parsing (this is the real network transfer)
+        val contentLength = contentLengthStr?.toLongOrNull() ?: 0
+        val uploadTransferId = UUID.randomUUID().toString()
+        // We don't know the filename yet — use a placeholder, update after parsing
+        TransferProgressManager.startTransfer(uploadTransferId, "Receiving file...", contentLength)
+
+        // Set progress listener to track real-time network bytes
+        session.setUploadProgressListener { bytesRead, totalBytes ->
+            TransferProgressManager.updateProgress(uploadTransferId, bytesRead)
+        }
+
         val files = HashMap<String, String>()
         try {
             session.parseBody(files)
         } catch (e: NanoHTTPD.ResponseException) {
+            TransferProgressManager.failTransfer(uploadTransferId)
             return jsonError(Response.Status.BAD_REQUEST, "Upload failed: ${e.message}")
         } catch (e: Exception) {
+            TransferProgressManager.failTransfer(uploadTransferId)
             return jsonError(Response.Status.INTERNAL_ERROR, "Upload failed: ${e.message}")
         }
 
@@ -401,21 +414,19 @@ class ApiHandler(
             if (tmpFile.exists()) {
                 if (tmpFile.length() > config.maxUploadSizeBytes) {
                     tmpFile.delete()
+                    TransferProgressManager.failTransfer(uploadTransferId)
                     return jsonError(
                         Response.Status.REQUEST_ENTITY_TOO_LARGE,
                         "File '$safeName' too large. Maximum: ${config.maxUploadSizeMB} MB"
                     )
                 }
 
-                // Track upload progress
-                val transferId = UUID.randomUUID().toString()
-                TransferProgressManager.startTransfer(transferId, safeName, tmpFile.length())
+                // Update the transfer entry with the real filename
+                TransferProgressManager.updateFileName(uploadTransferId, safeName)
 
                 tmpFile.copyTo(destFile, overwrite = true)
                 tmpFile.delete()
                 uploadedFiles.add(safeName)
-
-                TransferProgressManager.completeTransfer(transferId)
 
                 transferLogger.onTransfer(TransferLogEntry(
                     fileName = safeName,
@@ -428,8 +439,11 @@ class ApiHandler(
         }
 
         if (uploadedFiles.isEmpty()) {
+            TransferProgressManager.failTransfer(uploadTransferId)
             return jsonError(Response.Status.BAD_REQUEST, "No files were uploaded")
         }
+
+        TransferProgressManager.completeTransfer(uploadTransferId)
 
         return jsonResponse(mapOf(
             "success" to true,
