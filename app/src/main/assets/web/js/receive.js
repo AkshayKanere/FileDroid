@@ -61,6 +61,7 @@
         document.getElementById('selectBtn').addEventListener('click', () => {
             document.getElementById('fileInput').click();
         });
+        document.getElementById('cancelAllBtn').addEventListener('click', cancelAll);
     }
 
     // ---- Upload Queue ----
@@ -74,6 +75,7 @@
             });
             renderUploadItem(uploadQueue[uploadQueue.length - 1]);
         }
+        updateCancelButton();
         if (!isUploading) processQueue();
     }
 
@@ -106,6 +108,7 @@
             updateUploadItem(entry);
         }
         isUploading = false;
+        updateCancelButton();
         updateSummary();
     }
 
@@ -140,14 +143,23 @@
         });
     }
 
-    function cancelUpload(entry) {
-        if (entry.status === 'pending') {
-            entry.status = 'cancelled';
-            cancelledCount++;
-            updateUploadItem(entry);
-        } else if (entry.status === 'uploading' && entry.xhr) {
-            entry.xhr.abort();
+    function cancelAll() {
+        for (const entry of uploadQueue) {
+            if (entry.status === 'pending') {
+                entry.status = 'cancelled';
+                cancelledCount++;
+                updateUploadItem(entry);
+            } else if (entry.status === 'uploading' && entry.xhr) {
+                entry.xhr.abort();
+            }
         }
+        updateCancelButton();
+    }
+
+    function updateCancelButton() {
+        const btn = document.getElementById('cancelAllBtn');
+        const hasActive = uploadQueue.some(e => e.status === 'pending' || e.status === 'uploading');
+        btn.style.display = hasActive ? '' : 'none';
     }
 
     // ---- UI ----
@@ -164,18 +176,22 @@
             <span class="upload-item-name">${escapeHtml(entry.name)}</span>
             <span class="upload-item-size">${formatBytes(entry.size)}</span>`;
 
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'upload-cancel-btn';
-        cancelBtn.textContent = '\u2715';
-        cancelBtn.title = 'Cancel';
-        cancelBtn.addEventListener('click', () => cancelUpload(entry));
-        headerDiv.appendChild(cancelBtn);
-
         div.appendChild(headerDiv);
-        div.innerHTML += `<div class="upload-item-progress">
-            <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
-            <span class="upload-item-status">Waiting...</span>
-        </div>`;
+
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'upload-item-progress';
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        const progressFill = document.createElement('div');
+        progressFill.className = 'progress-bar-fill';
+        progressFill.style.width = '0%';
+        progressBar.appendChild(progressFill);
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'upload-item-status';
+        statusSpan.textContent = 'Waiting...';
+        progressDiv.appendChild(progressBar);
+        progressDiv.appendChild(statusSpan);
+        div.appendChild(progressDiv);
 
         list.appendChild(div);
     }
@@ -185,7 +201,6 @@
         if (!div) return;
         const fill = div.querySelector('.progress-bar-fill');
         const status = div.querySelector('.upload-item-status');
-        const cancelBtn = div.querySelector('.upload-cancel-btn');
 
         fill.style.width = entry.progress + '%';
 
@@ -200,20 +215,17 @@
                 fill.style.width = '100%';
                 status.textContent = '\u2705 Sent';
                 status.className = 'upload-item-status success';
-                if (cancelBtn) cancelBtn.style.display = 'none';
                 break;
             case 'error':
                 fill.className = 'progress-bar-fill error';
                 status.textContent = '\u274C ' + (entry.error || 'Failed');
                 status.className = 'upload-item-status error';
-                if (cancelBtn) cancelBtn.style.display = 'none';
                 break;
             case 'cancelled':
                 fill.className = 'progress-bar-fill';
                 fill.style.width = '0%';
                 status.textContent = '\u26D4 Cancelled';
                 status.className = 'upload-item-status error';
-                if (cancelBtn) cancelBtn.style.display = 'none';
                 break;
             default:
                 status.textContent = 'Waiting...';
