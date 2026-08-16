@@ -6,10 +6,29 @@ import android.os.Environment
 
 enum class ServerMode { SEND, RECEIVE }
 
-class ServerConfig(context: Context) {
+class ServerConfig private constructor(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("filedroid_config", Context.MODE_PRIVATE)
+
+    companion object {
+        @Volatile
+        private var instance: ServerConfig? = null
+
+        fun getInstance(context: Context): ServerConfig {
+            return instance ?: synchronized(this) {
+                instance ?: ServerConfig(context.applicationContext).also { instance = it }
+            }
+        }
+
+        private const val KEY_PORT = "port"
+        private const val KEY_HTTPS = "https_enabled"
+        private const val KEY_RECEIVE_FOLDER = "receive_folder"
+        private const val KEY_MAX_UPLOAD_SIZE = "max_upload_size_mb"
+
+        const val DEFAULT_PORT = 8080
+        const val DEFAULT_MAX_UPLOAD_MB = 3072  // 3 GB
+    }
 
     var port: Int
         get() = prefs.getInt(KEY_PORT, DEFAULT_PORT)
@@ -31,10 +50,10 @@ class ServerConfig(context: Context) {
         get() = maxUploadSizeMB.toLong() * 1024 * 1024
 
     /** Runtime-only: set before starting server, not persisted */
-    var serverMode: ServerMode = ServerMode.SEND
+    @Volatile var serverMode: ServerMode = ServerMode.SEND
 
-    /** Runtime-only: paths selected in the picker for Send mode */
-    var sharedPaths: Set<String> = emptySet()
+    /** Runtime-only: paths selected in the picker for Send mode (immutable snapshot, thread-safe) */
+    @Volatile var sharedPaths: Set<String> = emptySet()
 
     private val defaultReceiveFolder: String
         get() {
@@ -42,13 +61,4 @@ class ServerConfig(context: Context) {
             return "$base/FileDroid/Received"
         }
 
-    companion object {
-        private const val KEY_PORT = "port"
-        private const val KEY_HTTPS = "https_enabled"
-        private const val KEY_RECEIVE_FOLDER = "receive_folder"
-        private const val KEY_MAX_UPLOAD_SIZE = "max_upload_size_mb"
-
-        const val DEFAULT_PORT = 8080
-        const val DEFAULT_MAX_UPLOAD_MB = 3072  // 3 GB
-    }
 }

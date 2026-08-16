@@ -44,7 +44,7 @@ class WebServerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        config = ServerConfig(this)
+        config = ServerConfig.getInstance(this)
         security = SecurityManager(config)
         createNotificationChannel()
     }
@@ -80,17 +80,10 @@ class WebServerService : Service() {
         }
 
         val port = config.port
-        val protocol = if (config.httpsEnabled) "https" else "http"
+        val protocol = "http"
 
         try {
             server = FileDroidServer(this, config, security, port).apply {
-                if (config.httpsEnabled) {
-                    val sslFactory = SSLHelper.getSSLServerSocketFactory(this@WebServerService)
-                    if (sslFactory != null) {
-                        makeSecure(sslFactory)
-                    }
-                }
-
                 setTransferListener { entry ->
                     transferListener?.invoke(entry)
                     updateNotification()

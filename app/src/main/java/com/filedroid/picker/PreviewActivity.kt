@@ -1,5 +1,6 @@
 package com.filedroid.picker
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -29,7 +30,14 @@ class PreviewActivity : AppCompatActivity() {
         when {
             mime.startsWith("image/") -> {
                 binding.ivPreview.visibility = View.VISIBLE
-                binding.ivPreview.setImageURI(uri)
+                // Downsample large images to avoid OOM
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(path, opts)
+                var sample = 1
+                val maxDim = 2048
+                while (opts.outWidth / sample > maxDim || opts.outHeight / sample > maxDim) sample *= 2
+                val bmp = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+                if (bmp != null) binding.ivPreview.setImageBitmap(bmp) else binding.ivPreview.setImageURI(uri)
             }
             mime.startsWith("video/") -> {
                 binding.videoPreview.visibility = View.VISIBLE
@@ -51,6 +59,16 @@ class PreviewActivity : AppCompatActivity() {
                 binding.tvUnsupported.text = "Preview not available for this file type"
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (binding.videoPreview.isPlaying) binding.videoPreview.pause()
+    }
+
+    override fun onDestroy() {
+        binding.videoPreview.stopPlayback()
+        super.onDestroy()
     }
 
     companion object {

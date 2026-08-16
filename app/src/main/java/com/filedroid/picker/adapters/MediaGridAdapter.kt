@@ -14,7 +14,6 @@ import com.filedroid.databinding.ItemMediaGridBinding
 import com.filedroid.picker.model.MediaItem
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 class MediaGridAdapter(
@@ -38,12 +37,16 @@ class MediaGridAdapter(
 
     private val items = mutableListOf<ListItem>()
     private val thumbExecutor = Executors.newFixedThreadPool(4)
-    // In-memory bitmap cache to avoid reloading thumbnails on selection change
-    private val thumbCache = ConcurrentHashMap<String, Bitmap>()
+    // LruCache for thumbnails — max 20MB to prevent OOM
+    private val thumbCache = object : android.util.LruCache<String, Bitmap>(
+        20 * 1024 * 1024  // 20 MB
+    ) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount
+    }
 
     fun submitItems(mediaItems: List<MediaItem>) {
         items.clear()
-        thumbCache.clear()
+        thumbCache.evictAll()
         val grouped = groupByDate(mediaItems)
         for ((header, group) in grouped) {
             val paths = group.map { it.path }
@@ -51,6 +54,12 @@ class MediaGridAdapter(
             group.forEach { items.add(ListItem.Media(it)) }
         }
         notifyDataSetChanged()
+    }
+
+    /** Release thread pool and bitmap cache. Call in onDestroyView. */
+    fun shutdown() {
+        thumbExecutor.shutdownNow()
+        thumbCache.evictAll()
     }
 
     /** Call this instead of notifyDataSetChanged when only selection changed */
@@ -177,7 +186,7 @@ class MediaGridAdapter(
 
             // Load thumbnail — check cache first
             binding.ivThumbnail.tag = item.path
-            val cachedBitmap = thumbCache[item.path]
+            val cachedBitmap = thumbCache.get(item.path)
             if (cachedBitmap != null) {
                 binding.ivThumbnail.setImageBitmap(cachedBitmap)
             } else {
@@ -186,7 +195,7 @@ class MediaGridAdapter(
                     try {
                         val bitmap = loadThumbnail(item)
                         if (bitmap != null) {
-                            thumbCache[item.path] = bitmap
+                            thumbCache.put(item.path, bitmap)
                             binding.ivThumbnail.post {
                                 if (binding.ivThumbnail.tag == item.path) {
                                     binding.ivThumbnail.setImageBitmap(bitmap)

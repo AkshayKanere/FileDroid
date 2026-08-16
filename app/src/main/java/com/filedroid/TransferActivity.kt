@@ -114,13 +114,18 @@ class TransferActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        if (::progressAdapter.isInitialized) progressAdapter.shutdown()
+        super.onDestroy()
+    }
+
     private fun setupToolbar() {
         val titleText = when (mode) {
             ServerMode.SEND -> getString(R.string.sending_files)
             ServerMode.RECEIVE -> getString(R.string.receiving_files)
         }
         binding.toolbar.title = titleText
-        binding.toolbar.setNavigationOnClickListener { stopAndFinish() }
+        binding.toolbar.setNavigationOnClickListener { confirmStop() }
     }
 
     private fun setupUI() {
@@ -130,8 +135,8 @@ class TransferActivity : AppCompatActivity() {
         }
         binding.tvModeBadge.text = badgeText
 
-        binding.btnStop.text = if (mode == ServerMode.RECEIVE) "Stop Receiving" else getString(R.string.stop_sharing)
-        binding.btnStop.setOnClickListener { stopAndFinish() }
+        binding.btnStop.text = if (mode == ServerMode.RECEIVE) getString(R.string.stop_receiving) else getString(R.string.stop_sharing)
+        binding.btnStop.setOnClickListener { confirmStop() }
 
         // Show "Open Folder" button only in receive mode
         if (mode == ServerMode.RECEIVE) {
@@ -141,7 +146,7 @@ class TransferActivity : AppCompatActivity() {
     }
 
     private fun setupTransferLog() {
-        val receiveFolder = if (mode == ServerMode.RECEIVE) ServerConfig(this).receiveFolder else null
+        val receiveFolder = if (mode == ServerMode.RECEIVE) ServerConfig.getInstance(this).receiveFolder else null
         progressAdapter = TransferProgressAdapter(transferEntries, receiveFolder) { filePath ->
             // On click completed transfer — open preview
             val file = File(filePath)
@@ -207,7 +212,7 @@ class TransferActivity : AppCompatActivity() {
     }
 
     private fun openReceivedFolder() {
-        val config = ServerConfig(this)
+        val config = ServerConfig.getInstance(this)
         val folder = File(config.receiveFolder)
         if (!folder.exists()) folder.mkdirs()
 
@@ -238,9 +243,25 @@ class TransferActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun confirmStop() {
+        val hasActive = transferEntries.any {
+            it.status == TransferProgressManager.TransferStatus.IN_PROGRESS
+        }
+        if (hasActive) {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Stop Transfer?")
+                .setMessage("A transfer is in progress. Are you sure you want to stop?")
+                .setPositiveButton("Stop") { _, _ -> stopAndFinish() }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            stopAndFinish()
+        }
+    }
+
     @Deprecated("Use OnBackPressedCallback")
     override fun onBackPressed() {
-        stopAndFinish()
+        confirmStop()
     }
 
     companion object {
@@ -258,7 +279,16 @@ class TransferProgressAdapter(
 ) : RecyclerView.Adapter<TransferProgressAdapter.ViewHolder>() {
 
     private val thumbExecutor = Executors.newSingleThreadExecutor()
-    private val thumbCache = java.util.concurrent.ConcurrentHashMap<String, android.graphics.Bitmap>()
+    private val thumbCache = object : android.util.LruCache<String, android.graphics.Bitmap>(
+        10 * 1024 * 1024  // 10 MB
+    ) {
+        override fun sizeOf(key: String, bitmap: android.graphics.Bitmap): Int = bitmap.byteCount
+    }
+
+    fun shutdown() {
+        thumbExecutor.shutdownNow()
+        thumbCache.evictAll()
+    }
 
     class ViewHolder(val binding: ItemTransferProgressBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -300,7 +330,7 @@ class TransferProgressAdapter(
                 if (filePath != null) {
                     holder.binding.ivThumb.visibility = View.VISIBLE
                     holder.binding.ivThumb.tag = filePath
-                    val cached = thumbCache[filePath]
+                    val cached = thumbCache.get(filePath)
                     if (cached != null) {
                         holder.binding.ivThumb.setImageBitmap(cached)
                     } else {
@@ -309,7 +339,7 @@ class TransferProgressAdapter(
                             try {
                                 val bmp = loadSmallThumb(filePath)
                                 if (bmp != null) {
-                                    thumbCache[filePath] = bmp
+                                    thumbCache.put(filePath, bmp)
                                     holder.binding.ivThumb.post {
                                         if (holder.binding.ivThumb.tag == filePath) {
                                             holder.binding.ivThumb.setImageBitmap(bmp)

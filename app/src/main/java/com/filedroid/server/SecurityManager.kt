@@ -6,8 +6,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class SecurityManager(private val config: ServerConfig) {
 
-    // Rate limiting: IP -> list of timestamps
-    private val requestCounts = ConcurrentHashMap<String, MutableList<Long>>()
+    // Rate limiting: IP -> list of timestamps (thread-safe)
+    private val requestCounts = ConcurrentHashMap<String, java.util.concurrent.CopyOnWriteArrayList<Long>>()
 
     // Connected clients tracking
     private val connectedClients = ConcurrentHashMap<String, Long>()
@@ -18,13 +18,13 @@ class SecurityManager(private val config: ServerConfig) {
 
     fun isRequestRateLimited(ip: String): Boolean {
         val now = System.currentTimeMillis()
-        val reqs = requestCounts.getOrPut(ip) { mutableListOf() }
+        val reqs = requestCounts.getOrPut(ip) { java.util.concurrent.CopyOnWriteArrayList() }
         reqs.removeAll { now - it > 60_000L }
         return reqs.size >= MAX_REQUESTS_PER_MINUTE
     }
 
     fun recordRequest(ip: String) {
-        val reqs = requestCounts.getOrPut(ip) { mutableListOf() }
+        val reqs = requestCounts.getOrPut(ip) { java.util.concurrent.CopyOnWriteArrayList() }
         reqs.add(System.currentTimeMillis())
     }
 

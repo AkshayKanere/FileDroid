@@ -12,6 +12,7 @@
     <string name="sending_files">Sending Files</string>
     <string name="receiving_files">Receiving Files</string>
     <string name="stop_sharing">Stop Sharing</string>
+    <string name="stop_receiving">Stop Receiving</string>
     <string name="scan_qr_code">Scan QR code or open URL in browser</string>
     <string name="transfer_log">Transfers</string>
     <string name="waiting_for_connection">Waiting for connection\u2026</string>

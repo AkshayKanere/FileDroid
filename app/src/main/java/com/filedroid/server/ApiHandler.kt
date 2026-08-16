@@ -282,12 +282,11 @@ class ApiHandler(
         val filePath = params["path"]
             ?: return jsonError(Response.Status.BAD_REQUEST, "Missing path")
 
-        if (!security.isPathAllowed(filePath)) {
-            return jsonError(Response.Status.FORBIDDEN, "Access denied")
-        }
+        val safePath = security.sanitizePath(filePath, security.getAllowedRoots())
+            ?: return jsonError(Response.Status.FORBIDDEN, "Access denied")
 
         val size = params["size"]?.toIntOrNull() ?: 256
-        val thumbData = thumbnailCache.getThumbnail(filePath, size)
+        val thumbData = thumbnailCache.getThumbnail(safePath, size)
             ?: return jsonError(Response.Status.NOT_FOUND, "Cannot generate thumbnail")
 
         val response = NanoHTTPD.newFixedLengthResponse(
@@ -304,11 +303,10 @@ class ApiHandler(
         val filePath = params["path"]
             ?: return jsonError(Response.Status.BAD_REQUEST, "Missing path")
 
-        if (!security.isPathAllowed(filePath)) {
-            return jsonError(Response.Status.FORBIDDEN, "Access denied")
-        }
+        val safePath = security.sanitizePath(filePath, security.getAllowedRoots())
+            ?: return jsonError(Response.Status.FORBIDDEN, "Access denied")
 
-        val file = File(filePath)
+        val file = File(safePath)
         if (!file.exists()) return jsonError(Response.Status.NOT_FOUND, "File not found")
 
         val mimeType = NanoHTTPD.getMimeType(file.name)

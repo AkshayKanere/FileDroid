@@ -125,6 +125,7 @@ class ImagesFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         scope.cancel()
+        adapter.shutdown()
         _binding = null
     }
 }

@@ -17,7 +17,7 @@ class SettingsActivity : AppCompatActivity() {
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        config = ServerConfig(this)
+        config = ServerConfig.getInstance(this)
 
         setupToolbar()
         loadSettings()
@@ -30,7 +30,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun loadSettings() {
         binding.etPort.setText(config.port.toString())
-        binding.switchHttps.isChecked = config.httpsEnabled
+        // HTTPS is disabled — self-signed certs not supported on Android
+        binding.switchHttps.isChecked = false
+        binding.switchHttps.isEnabled = false
         binding.tvReceiveFolder.text = config.receiveFolder
         binding.etMaxUploadSize.setText(config.maxUploadSizeMB.toString())
     }
