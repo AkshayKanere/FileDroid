@@ -50,7 +50,7 @@ class ThumbnailCache(private val context: Context) {
                 bitmap.recycle()
                 enforceCacheLimit()
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.w("ThumbnailCache", "Failed to save thumbnail", e)
             }
 
             return if (cacheFile.exists()) cacheFile.readBytes() else null
@@ -72,7 +72,7 @@ class ThumbnailCache(private val context: Context) {
                 else -> null
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("ThumbnailCache", "Thumbnail generation failed", e)
             null
         }
     }
@@ -129,7 +129,7 @@ class ThumbnailCache(private val context: Context) {
                 scaled
             } else null
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("ThumbnailCache", "Video thumbnail failed", e)
             null
         } finally {
             try { retriever.release() } catch (ignore: Exception) {}
@@ -160,7 +160,7 @@ class ThumbnailCache(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("ThumbnailCache", "Cache limit enforcement failed", e)
         }
     }
 

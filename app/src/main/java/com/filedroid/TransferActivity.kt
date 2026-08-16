@@ -181,7 +181,7 @@ class TransferActivity : AppCompatActivity() {
                 val qrBitmap = QRCodeGenerator.generate(url, 512)
                 binding.ivQrCode.setImageBitmap(qrBitmap)
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.w("TransferActivity", "QR code generation failed", e)
             }
             updateClientCount()
         } else if (!running && url != null) {

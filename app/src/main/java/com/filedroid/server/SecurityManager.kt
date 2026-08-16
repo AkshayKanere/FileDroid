@@ -54,7 +54,7 @@ class SecurityManager(private val config: ServerConfig) {
         val canonical = File(path).canonicalPath
         return config.sharedPaths.any { sharedPath ->
             val sharedCanonical = File(sharedPath).canonicalPath
-            canonical.startsWith(sharedCanonical) || sharedCanonical.startsWith(canonical)
+            canonical.startsWith(sharedCanonical)
         }
     }
 

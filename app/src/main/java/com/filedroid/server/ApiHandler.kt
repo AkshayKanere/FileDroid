@@ -259,7 +259,7 @@ class ApiHandler(
                 // Broken pipe = client disconnected, normal
                 TransferProgressManager.failTransfer(transferId)
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.w("ApiHandler", "ZIP write error", e)
                 TransferProgressManager.failTransfer(transferId)
             } finally {
                 try { pipedOutputStream.close() } catch (_: Exception) {}

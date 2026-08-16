@@ -1,6 +1,23 @@
 /* ========== Base & Reset ========== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ========== Connection Banner ========== */
+.connection-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #D32F2F;
+    color: #fff;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    animation: slideDown 0.3s ease;
+}
+@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
 :root {
     --primary: #1976D2;
     --primary-dark: #1565C0;

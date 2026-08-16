@@ -45,7 +45,7 @@ object NetworkUtils {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("NetworkUtils", "Failed to get IP address", e)
         }
         return null
     }

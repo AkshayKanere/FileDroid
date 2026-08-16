@@ -15,10 +15,30 @@
 
     init();
 
+    let connectionLost = false;
+
     async function init() {
         setupDropzone();
         setupButtons();
         await loadServerInfo();
+        startHeartbeat();
+    }
+
+    function startHeartbeat() {
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/info', { signal: AbortSignal.timeout(5000) });
+                if (res.ok && connectionLost) {
+                    connectionLost = false;
+                    document.getElementById('connectionBanner').style.display = 'none';
+                }
+            } catch (e) {
+                if (!connectionLost) {
+                    connectionLost = true;
+                    document.getElementById('connectionBanner').style.display = 'block';
+                }
+            }
+        }, 5000);
     }
 
     async function loadServerInfo() {
@@ -27,7 +47,9 @@
             const info = await res.json();
             document.getElementById('serverInfo').textContent =
                 `${info.deviceName} \u2022 ${formatBytes(info.freeSpace)} free of ${formatBytes(info.totalSpace)} \u2022 Max: ${formatBytes(info.uploadMaxSize)}`;
-        } catch (e) {}
+        } catch (e) {
+            document.getElementById('serverInfo').textContent = 'Unable to connect to phone';
+        }
     }
 
     function setupDropzone() {

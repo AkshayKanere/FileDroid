@@ -21,12 +21,32 @@
     // ---- Init ----
     init();
 
+    let connectionLost = false;
+
     async function init() {
         setupThumbObserver();
         applyViewMode();
         setupEventListeners();
         await loadServerInfo();
         navigateTo(null);
+        startHeartbeat();
+    }
+
+    function startHeartbeat() {
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/info', { signal: AbortSignal.timeout(5000) });
+                if (res.ok && connectionLost) {
+                    connectionLost = false;
+                    document.getElementById('connectionBanner').style.display = 'none';
+                }
+            } catch (e) {
+                if (!connectionLost) {
+                    connectionLost = true;
+                    document.getElementById('connectionBanner').style.display = 'block';
+                }
+            }
+        }, 5000);
     }
 
     function setupEventListeners() {
@@ -117,7 +137,9 @@
             const free = formatBytes(info.freeSpace);
             const total = formatBytes(info.totalSpace);
             el.textContent = `${info.deviceName} \u2022 ${free} free of ${total}`;
-        } catch (e) {}
+        } catch (e) {
+            document.getElementById('serverInfo').textContent = 'Unable to connect to phone';
+        }
     }
 
     // ---- Navigation ----

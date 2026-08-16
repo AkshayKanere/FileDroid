@@ -31,7 +31,7 @@ object SSLHelper {
 
             sslContext.serverSocketFactory
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("SSLHelper", "Failed to create SSL context", e)
             null
         }
     }

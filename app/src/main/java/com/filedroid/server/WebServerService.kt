@@ -12,12 +12,23 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.filedroid.MainActivity
 import com.filedroid.R
+import android.util.Log
 import com.filedroid.model.ServerConfig
 import com.filedroid.model.ServerMode
 import com.filedroid.model.TransferLogEntry
 import com.filedroid.util.NetworkUtils
+import java.io.File
 
 class WebServerService : Service() {
+
+    companion object {
+        private const val TAG = "WebServerService"
+        const val CHANNEL_ID = "filedroid_server"
+        const val NOTIFICATION_ID = 1001
+        const val ACTION_STOP = "com.filedroid.STOP_SERVER"
+        const val EXTRA_MODE = "server_mode"
+        const val EXTRA_SHARED_PATHS = "shared_paths"
+    }
 
     private val binder = LocalBinder()
     private var server: FileDroidServer? = null
@@ -73,6 +84,9 @@ class WebServerService : Service() {
     fun startServer() {
         if (isRunning) return
 
+        // Clean up stale temp files from previous interrupted uploads
+        cleanTempFiles()
+
         val ip = NetworkUtils.getWifiIpAddress(this)
         if (ip == null) {
             statusListener?.invoke(false, "Not connected to WiFi")
@@ -111,7 +125,7 @@ class WebServerService : Service() {
             statusListener?.invoke(true, serverUrl)
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to start server", e)
             statusListener?.invoke(false, "Failed to start server: ${e.message}")
             stopServer()
         }
@@ -122,7 +136,7 @@ class WebServerService : Service() {
             server?.stop()
             server = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Error stopping server", e)
         }
 
         security.clearSessions()
@@ -219,7 +233,7 @@ class WebServerService : Service() {
             wifiLock?.setReferenceCounted(false)
             wifiLock?.acquire()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Failed to acquire WiFi lock", e)
         }
     }
 
@@ -228,7 +242,7 @@ class WebServerService : Service() {
             wifiLock?.let { if (it.isHeld) it.release() }
             wifiLock = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Failed to release WiFi lock", e)
         }
     }
 
@@ -242,7 +256,7 @@ class WebServerService : Service() {
             wakeLock?.setReferenceCounted(false)
             wakeLock?.acquire(4 * 60 * 60 * 1000L) // 4 hours max
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Failed to acquire wake lock", e)
         }
     }
 
@@ -251,7 +265,24 @@ class WebServerService : Service() {
             wakeLock?.let { if (it.isHeld) it.release() }
             wakeLock = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Failed to release wake lock", e)
+        }
+    }
+
+    private fun cleanTempFiles() {
+        try {
+            val tmpDir = cacheDir
+            tmpDir.listFiles()?.filter {
+                it.name.startsWith("nanohttpd-") || it.name.startsWith("upload-")
+            }?.forEach { it.delete() }
+
+            // Also clean system temp dir
+            val sysTmp = File(System.getProperty("java.io.tmpdir") ?: return)
+            sysTmp.listFiles()?.filter {
+                it.name.startsWith("nanohttpd-") || it.name.startsWith("upload-")
+            }?.forEach { it.delete() }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clean temp files", e)
         }
     }
 
@@ -264,13 +295,5 @@ class WebServerService : Service() {
         // Don't stop the server — let transfers continue even if the user swipes the app away.
         // The foreground notification with its "Stop" button remains visible for manual control.
         super.onTaskRemoved(rootIntent)
-    }
-
-    companion object {
-        const val CHANNEL_ID = "filedroid_server"
-        const val NOTIFICATION_ID = 1001
-        const val ACTION_STOP = "com.filedroid.STOP_SERVER"
-        const val EXTRA_MODE = "server_mode"
-        const val EXTRA_SHARED_PATHS = "shared_paths"
     }
 }

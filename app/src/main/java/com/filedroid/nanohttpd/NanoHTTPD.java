@@ -172,7 +172,7 @@ public abstract class NanoHTTPD {
         private Map<String, String> parms = new HashMap<>();
         private Map<String, String> headers = new HashMap<>();
         private String queryString;
-        private int contentLength;
+        private long contentLength;
         private String contentType;
         private Map<String, List<String>> multipartHeaders = new HashMap<>();
         private Map<String, String> multipartFiles = new HashMap<>();
@@ -230,7 +230,7 @@ public abstract class NanoHTTPD {
             contentLength = 0;
             if (headers.containsKey("content-length")) {
                 try {
-                    contentLength = Integer.parseInt(headers.get("content-length"));
+                    contentLength = Long.parseLong(headers.get("content-length"));
                 } catch (NumberFormatException ignore) {
                 }
             }
@@ -278,7 +278,7 @@ public abstract class NanoHTTPD {
 
                 parseMultipart(boundary, files);
             } else if (contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
-                byte[] body = readBytes(inputStream, contentLength);
+                byte[] body = readBytes(inputStream, (int) Math.min(contentLength, 10 * 1024 * 1024));
                 String bodyStr = new String(body, StandardCharsets.UTF_8);
                 parseQueryString(bodyStr, parms);
             } else {
