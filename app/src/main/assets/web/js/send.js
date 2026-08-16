@@ -353,33 +353,22 @@
         }
     }
 
-    async function downloadAsZip() {
+    function downloadAsZip() {
         if (selectedFiles.size === 0) return;
-        const btn = document.getElementById('downloadZip');
-        btn.disabled = true;
-        btn.textContent = '⏳ Zipping...';
-        try {
-            const res = await fetch('/api/download-zip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Array.from(selectedFiles))
-            });
-            if (!res.ok) throw new Error('Server error ' + res.status);
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'FileDroid_download.zip';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            alert('ZIP download failed: ' + e.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📦 Download ZIP';
-        }
+        // Use a hidden form POST — browser handles the streaming download natively
+        // (no blob in memory, shows progress in download manager)
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/download-zip';
+        form.style.display = 'none';
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'paths';
+        input.value = JSON.stringify(Array.from(selectedFiles));
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
     }
 
     // ---- Preview ----
