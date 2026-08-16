@@ -17,6 +17,8 @@ class FileDroidServer(
 
     private val thumbnailCache = ThumbnailCache(context)
     private var transferListener: ((TransferLogEntry) -> Unit)? = null
+    /** Unique per server start — forces browsers to re-fetch all assets */
+    private val cacheBuster = System.currentTimeMillis().toString()
 
     private val apiHandler: ApiHandler by lazy {
         ApiHandler(config, security, thumbnailCache, object : ApiHandler.TransferLogger {
@@ -77,10 +79,23 @@ class FileDroidServer(
 
         return try {
             val inputStream: InputStream = context.assets.open(assetPath)
-            val bytes = inputStream.readBytes()
+            var bytes = inputStream.readBytes()
             inputStream.close()
 
             val mimeType = getMimeType(path)
+
+            // For HTML files, inject cache-busting query params on CSS/JS references
+            // so the browser always fetches fresh assets after each app restart
+            if (path.endsWith(".html")) {
+                var html = String(bytes, Charsets.UTF_8)
+                html = html.replace(Regex("""(href|src)="([^"]+\.(css|js))"""")) { match ->
+                    val attr = match.groupValues[1]
+                    val url = match.groupValues[2]
+                    """$attr="$url?v=$cacheBuster""""
+                }
+                bytes = html.toByteArray(Charsets.UTF_8)
+            }
+
             val response = newFixedLengthResponse(
                 Response.Status.OK, mimeType,
                 ByteArrayInputStream(bytes), bytes.size.toLong()
