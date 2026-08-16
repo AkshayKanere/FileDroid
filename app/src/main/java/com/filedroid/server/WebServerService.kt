@@ -261,8 +261,8 @@ class WebServerService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        stopServer()
-        stopSelf()
+        // Don't stop the server — let transfers continue even if the user swipes the app away.
+        // The foreground notification with its "Stop" button remains visible for manual control.
         super.onTaskRemoved(rootIntent)
     }
 
