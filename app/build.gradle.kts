@@ -15,6 +15,12 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Uses default debug keystore
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -23,6 +29,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Use debug signing for now — replace with release keystore before Play Store submission
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
