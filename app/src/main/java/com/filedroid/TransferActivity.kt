@@ -129,11 +129,12 @@ class TransferActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        val badgeText = when (mode) {
-            ServerMode.SEND -> "\uD83D\uDCE4 ${getString(R.string.sending_files)}"
-            ServerMode.RECEIVE -> "\uD83D\uDCE5 ${getString(R.string.receiving_files)}"
+        if (mode == ServerMode.SEND) {
+            binding.tvModeBadge.text = "\uD83D\uDCE4 ${getString(R.string.sending_files)}"
+            binding.tvModeBadge.visibility = android.view.View.VISIBLE
+        } else {
+            binding.tvModeBadge.visibility = android.view.View.GONE
         }
-        binding.tvModeBadge.text = badgeText
 
         binding.btnStop.text = if (mode == ServerMode.RECEIVE) getString(R.string.stop_receiving) else getString(R.string.stop_sharing)
         binding.btnStop.setOnClickListener { confirmStop() }

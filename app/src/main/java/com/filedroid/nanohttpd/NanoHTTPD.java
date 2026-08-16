@@ -404,7 +404,7 @@ public abstract class NanoHTTPD {
         /** Find a byte pattern in a RandomAccessFile starting from pos. */
         private static long findBytes(RandomAccessFile raf, byte[] pattern, long startPos) throws IOException {
             raf.seek(startPos);
-            byte[] buf = new byte[65536];
+            byte[] buf = new byte[131072]; // 128KB buffer for faster boundary search
             long filePos = startPos;
             int carry = 0;
             byte[] window = new byte[buf.length + pattern.length];
@@ -639,7 +639,7 @@ public abstract class NanoHTTPD {
     }
 
     protected static void copyStream(InputStream in, OutputStream out, long maxBytes) throws IOException {
-        byte[] buf = new byte[8192];
+        byte[] buf = new byte[131072]; // 128KB buffer for better throughput
         long total = 0;
         int read;
         while (total < maxBytes && (read = in.read(buf, 0, (int) Math.min(buf.length, maxBytes - total))) != -1) {
@@ -650,14 +650,14 @@ public abstract class NanoHTTPD {
 
     protected static void copyStreamWithProgress(InputStream in, OutputStream out, long maxBytes,
                                                   UploadProgressListener listener) throws IOException {
-        byte[] buf = new byte[65536];
+        byte[] buf = new byte[131072]; // 128KB buffer for fast uploads
         long total = 0;
         long lastReport = 0;
         int read;
         while (total < maxBytes && (read = in.read(buf, 0, (int) Math.min(buf.length, maxBytes - total))) != -1) {
             out.write(buf, 0, read);
             total += read;
-            if (listener != null && (total - lastReport >= 65536 || total >= maxBytes)) {
+            if (listener != null && (total - lastReport >= 131072 || total >= maxBytes)) {
                 lastReport = total;
                 listener.onProgress(total, maxBytes);
             }

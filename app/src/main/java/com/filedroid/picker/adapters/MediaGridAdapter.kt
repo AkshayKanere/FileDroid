@@ -37,16 +37,16 @@ class MediaGridAdapter(
 
     private val items = mutableListOf<ListItem>()
     private val thumbExecutor = Executors.newFixedThreadPool(4)
-    // LruCache for thumbnails — max 20MB to prevent OOM
+    // LruCache for thumbnails — 40MB for smooth scrolling without blanks
     private val thumbCache = object : android.util.LruCache<String, Bitmap>(
-        20 * 1024 * 1024  // 20 MB
+        40 * 1024 * 1024  // 40 MB
     ) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount
     }
 
     fun submitItems(mediaItems: List<MediaItem>) {
         items.clear()
-        thumbCache.evictAll()
+        // Don't evict thumbCache — reuse cached bitmaps for smooth scrolling
         val grouped = groupByDate(mediaItems)
         for ((header, group) in grouped) {
             val paths = group.map { it.path }
@@ -189,21 +189,27 @@ class MediaGridAdapter(
             val cachedBitmap = thumbCache.get(item.path)
             if (cachedBitmap != null) {
                 binding.ivThumbnail.setImageBitmap(cachedBitmap)
+                binding.ivThumbnail.setBackgroundColor(0)
             } else {
+                // Show a light gray placeholder while loading (not blank)
                 binding.ivThumbnail.setImageDrawable(null)
-                thumbExecutor.execute {
-                    try {
-                        val bitmap = loadThumbnail(item)
-                        if (bitmap != null) {
-                            thumbCache.put(item.path, bitmap)
-                            binding.ivThumbnail.post {
-                                if (binding.ivThumbnail.tag == item.path) {
-                                    binding.ivThumbnail.setImageBitmap(bitmap)
+                binding.ivThumbnail.setBackgroundColor(0xFFE0E0E0.toInt())
+                if (!thumbExecutor.isShutdown) {
+                    thumbExecutor.execute {
+                        try {
+                            val bitmap = loadThumbnail(item)
+                            if (bitmap != null) {
+                                thumbCache.put(item.path, bitmap)
+                                binding.ivThumbnail.post {
+                                    if (binding.ivThumbnail.tag == item.path) {
+                                        binding.ivThumbnail.setImageBitmap(bitmap)
+                                        binding.ivThumbnail.setBackgroundColor(0)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            // Ignore
                         }
-                    } catch (e: Exception) {
-                        // Ignore
                     }
                 }
             }
