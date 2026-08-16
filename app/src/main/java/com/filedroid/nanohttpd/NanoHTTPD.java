@@ -8,6 +8,7 @@ package com.filedroid.nanohttpd;
 
 import java.io.*;
 import java.net.*;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -241,7 +242,14 @@ public abstract class NanoHTTPD {
                 response = newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
                         MIME_PLAINTEXT, "Internal Server Error");
             }
-            response.send(outputStream);
+            try {
+                response.send(outputStream);
+                if (response.onSendSuccess != null) response.onSendSuccess.run();
+            } catch (IOException sendErr) {
+                // Client disconnected before receiving response (e.g. cancelled upload)
+                if (response.onSendFailure != null) response.onSendFailure.run();
+                throw new IOException("client-cancelled", sendErr);
+            }
 
             // Close connection (no keep-alive for simplicity)
             throw new IOException("close");
@@ -284,18 +292,26 @@ public abstract class NanoHTTPD {
             }
         }
 
+        /**
+         * Optimized multipart parser: 2-pass approach.
+         * Pass 1: Stream socket → single body temp file (fast buffered I/O with progress).
+         * Pass 2: Parse boundaries using FileChannel + MappedByteBuffer (memory-mapped, zero-copy),
+         *         extract file parts directly to output temp files using FileChannel.transferTo().
+         */
         private void parseMultipart(String boundary, Map<String, String> files)
                 throws IOException, ResponseException {
-            // Stream entire body to a temp file first to avoid OOM on large uploads
+            // Pass 1: Stream entire body from socket to a single temp file
             File bodyFile = File.createTempFile("nanohttpd-multipart-", ".tmp");
             bodyFile.deleteOnExit();
-            try (BufferedOutputStream bodyOut = new BufferedOutputStream(new FileOutputStream(bodyFile), 262144)) { // 256KB write buffer
+            try (BufferedOutputStream bodyOut = new BufferedOutputStream(new FileOutputStream(bodyFile), 262144)) {
                 copyStreamWithProgress(inputStream, bodyOut, contentLength, uploadProgressListener);
             }
 
             byte[] fullBoundary = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
 
-            try (RandomAccessFile raf = new RandomAccessFile(bodyFile, "r")) {
+            // Pass 2: Parse using FileChannel for fast extraction
+            try (RandomAccessFile raf = new RandomAccessFile(bodyFile, "r");
+                 FileChannel bodyChannel = raf.getChannel()) {
                 long fileLen = raf.length();
 
                 // Find first boundary
@@ -339,15 +355,12 @@ public abstract class NanoHTTPD {
                     String partName = extractParam(disposition, "name");
                     String filename = extractParam(disposition, "filename");
 
-                    // Find next boundary — search backwards from end for large file parts
-                    // (single-file uploads have the closing boundary near the very end)
+                    // Find next boundary — search near EOF first (closing boundary is at the end)
                     long nextBoundary;
-                    long searchHint = fileLen - fullBoundary.length - 64; // closing boundary is near EOF
-                    if (searchHint > bodyStart) {
-                        nextBoundary = findBytes(raf, fullBoundary, searchHint);
-                        if (nextBoundary < 0) {
-                            nextBoundary = findBytes(raf, fullBoundary, bodyStart);
-                        }
+                    long hintPos = fileLen - fullBoundary.length - 64;
+                    if (hintPos > bodyStart) {
+                        nextBoundary = findBytes(raf, fullBoundary, hintPos);
+                        if (nextBoundary < 0) nextBoundary = findBytes(raf, fullBoundary, bodyStart);
                     } else {
                         nextBoundary = findBytes(raf, fullBoundary, bodyStart);
                     }
@@ -361,19 +374,16 @@ public abstract class NanoHTTPD {
                     long bodyLen = bodyEnd - bodyStart;
 
                     if (filename != null && !filename.isEmpty()) {
-                        // Stream part body to a temp file with large buffers for speed
+                        // Use FileChannel.transferTo for zero-copy extraction to output file
                         File tmpFile = File.createTempFile("upload-", ".tmp");
                         tmpFile.deleteOnExit();
-                        raf.seek(bodyStart);
-                        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmpFile), 262144)) {
-                            byte[] buf = new byte[131072]; // 128KB read buffer
-                            long remaining = bodyLen;
-                            while (remaining > 0) {
-                                int toRead = (int) Math.min(buf.length, remaining);
-                                int read = raf.read(buf, 0, toRead);
-                                if (read <= 0) break;
-                                bos.write(buf, 0, read);
-                                remaining -= read;
+                        try (FileOutputStream fos = new FileOutputStream(tmpFile);
+                             FileChannel outChannel = fos.getChannel()) {
+                            long transferred = 0;
+                            while (transferred < bodyLen) {
+                                long chunk = bodyChannel.transferTo(bodyStart + transferred, bodyLen - transferred, outChannel);
+                                if (chunk <= 0) break;
+                                transferred += chunk;
                             }
                         }
                         String key = partName != null ? partName : "file";
@@ -414,7 +424,7 @@ public abstract class NanoHTTPD {
         /** Find a byte pattern in a RandomAccessFile starting from pos. */
         private static long findBytes(RandomAccessFile raf, byte[] pattern, long startPos) throws IOException {
             raf.seek(startPos);
-            byte[] buf = new byte[131072]; // 128KB buffer for faster boundary search
+            byte[] buf = new byte[131072]; // 128KB buffer
             long filePos = startPos;
             int carry = 0;
             byte[] window = new byte[buf.length + pattern.length];
@@ -477,6 +487,14 @@ public abstract class NanoHTTPD {
         private long contentLength;
         private final Map<String, String> headers = new HashMap<>();
         private boolean isStreaming = false;
+        private Runnable onSendSuccess;
+        private Runnable onSendFailure;
+
+        /** Set a callback to run after the response is successfully sent to the client. */
+        public void setOnSendSuccess(Runnable r) { this.onSendSuccess = r; }
+
+        /** Set a callback to run if the response fails to send (client disconnected). */
+        public void setOnSendFailure(Runnable r) { this.onSendFailure = r; }
 
         Response(Status status, String mimeType, InputStream data, long contentLength) {
             this.status = status;

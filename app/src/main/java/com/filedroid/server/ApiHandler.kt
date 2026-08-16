@@ -543,13 +543,24 @@ class ApiHandler(
             return jsonError(Response.Status.BAD_REQUEST, "No files were uploaded")
         }
 
-        TransferProgressManager.completeTransfer(uploadTransferId)
-
-        return jsonResponse(mapOf(
+        // Don't mark complete yet — wait until response is actually sent to the browser.
+        // If client cancelled (disconnected), clean up the uploaded files.
+        val response = jsonResponse(mapOf(
             "success" to true,
             "files" to uploadedFiles,
             "message" to "${uploadedFiles.size} file(s) uploaded successfully"
         ))
+        response.setOnSendSuccess {
+            TransferProgressManager.completeTransfer(uploadTransferId)
+        }
+        response.setOnSendFailure {
+            // Client cancelled — delete uploaded files and mark as failed
+            for (name in uploadedFiles) {
+                try { File(uploadDir, name).delete() } catch (_: Exception) {}
+            }
+            TransferProgressManager.failTransfer(uploadTransferId)
+        }
+        return response
     }
 
     private fun sanitizeFileName(name: String): String {
