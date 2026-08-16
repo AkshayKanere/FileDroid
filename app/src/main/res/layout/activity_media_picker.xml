@@ -7,66 +7,63 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background"
-    tools:context=".FilePickerActivity">
+    tools:context=".picker.MediaPickerActivity">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/primary"
-        app:title="@string/select_files_to_share"
+        app:title="@string/select_files"
         app:titleTextColor="@color/on_primary"
         app:navigationIcon="?attr/homeAsUpIndicator"
         app:navigationIconTint="@color/on_primary" />
 
-    <!-- Breadcrumbs -->
-    <HorizontalScrollView
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
-        android:elevation="1dp"
-        android:scrollbars="none">
+        android:background="@color/primary"
+        app:tabTextColor="@color/primary_light"
+        app:tabSelectedTextColor="@color/on_primary"
+        app:tabIndicatorColor="@color/on_primary"
+        app:tabMode="scrollable"
+        app:tabGravity="start" />
 
-        <LinearLayout
-            android:id="@+id/breadcrumbContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="12dp" />
-
-    </HorizontalScrollView>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvFiles"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <!-- Bottom selection bar -->
     <LinearLayout
+        android:id="@+id/bottomBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="12dp"
+        android:gravity="center_vertical"
         android:background="@color/surface"
-        android:elevation="4dp">
+        android:elevation="8dp"
+        android:visibility="gone"
+        tools:visibility="visible">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCancel"
+        <TextView
+            android:id="@+id/tvSelectedCount"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="Cancel"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+            android:textSize="15sp"
+            android:textStyle="bold"
+            tools:text="3 files selected" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDone"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Done" />
+            android:text="@string/done"
+            app:cornerRadius="20dp" />
 
     </LinearLayout>
 

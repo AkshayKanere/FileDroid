@@ -49,9 +49,18 @@
             android:label="@string/settings" />
 
         <activity
-            android:name=".FilePickerActivity"
+            android:name=".TransferActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".picker.MediaPickerActivity"
             android:exported="false"
-            android:label="@string/select_files_to_share" />
+            android:label="@string/select_files" />
+
+        <activity
+            android:name=".picker.PreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FileDroid" />
 
         <service
             android:name=".server.WebServerService"

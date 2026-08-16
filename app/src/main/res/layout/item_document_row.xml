@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingVertical="10dp"
+    android:paddingHorizontal="12dp"
+    android:gravity="center_vertical"
+    android:background="?android:attr/selectableItemBackground">
+
+    <CheckBox
+        android:id="@+id/checkbox"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="12dp"
+        android:buttonTint="@color/primary" />
+
+    <TextView
+        android:id="@+id/tvIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:textSize="24sp"
+        android:gravity="center"
+        android:background="@drawable/circle_bg_send"
+        android:layout_marginEnd="12dp"
+        tools:text="📄" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            tools:text="report.pdf" />
+
+        <TextView
+            android:id="@+id/tvMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="2dp"
+            android:singleLine="true"
+            tools:text="2.1 MB • Aug 15, 2024" />
+
+    </LinearLayout>
+
+</LinearLayout>

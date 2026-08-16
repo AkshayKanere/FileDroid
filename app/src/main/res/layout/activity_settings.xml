@@ -29,7 +29,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Port Configuration -->
+            <!-- Server Configuration -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -66,7 +66,6 @@
 
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- HTTPS Toggle -->
                     <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/switchHttps"
                         android:layout_width="match_parent"
@@ -79,7 +78,7 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Upload Configuration -->
+            <!-- Receive Configuration -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -96,7 +95,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Upload Configuration"
+                        android:text="Receive Settings"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp" />
@@ -104,35 +103,19 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Upload Destination Folder"
+                        android:text="Received files will be saved to:"
                         android:textSize="14sp"
                         android:textColor="@color/text_secondary" />
 
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/tvReceiveFolder"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:layout_marginTop="4dp"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:id="@+id/tvUploadFolder"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:textSize="14sp"
-                            android:singleLine="true"
-                            android:ellipsize="start"
-                            tools:text="/storage/emulated/0/FileDroid/Uploads" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnPickUploadFolder"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Change"
-                            style="@style/Widget.Material3.Button.TextButton" />
-
-                    </LinearLayout>
+                        android:textSize="14sp"
+                        android:singleLine="true"
+                        android:ellipsize="start"
+                        tools:text="/storage/emulated/0/FileDroid/Received" />
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
@@ -149,103 +132,6 @@
                             android:text="500" />
 
                     </com.google.android.material.textfield.TextInputLayout>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- PIN Protection -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchPin"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/pin_protection"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilPin"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:hint="PIN (4-6 digits)"
-                        android:visibility="gone"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                        app:endIconMode="password_toggle">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etPin"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="numberPassword"
-                            android:maxLength="6" />
-
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- File Sharing -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="File Sharing"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="12dp" />
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchShareAll"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/share_all_files"
-                        android:checked="true" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnSelectFiles"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/select_shared_files"
-                        android:visibility="gone"
-                        style="@style/Widget.Material3.Button.OutlinedButton" />
-
-                    <TextView
-                        android:id="@+id/tvSharedCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_secondary"
-                        android:visibility="gone"
-                        tools:text="3 folders selected" />
 
                 </LinearLayout>
 

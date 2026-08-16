@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2196F3">
+    <title>FileDroid - Send Files</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="receive-mode">
+    <div id="app">
+        <!-- Header -->
+        <header class="header header-receive">
+            <div class="header-left">
+                <span class="logo">📂 FileDroid</span>
+                <span class="mode-badge mode-receive">📤 Send to Phone</span>
+            </div>
+        </header>
+
+        <!-- Upload Area -->
+        <main class="upload-page">
+            <div class="upload-hero">
+                <div class="upload-dropzone" id="dropzone">
+                    <div class="dropzone-content">
+                        <span class="dropzone-icon">📤</span>
+                        <h2>Drop files here</h2>
+                        <p>or click to select files</p>
+                        <input type="file" id="fileInput" multiple style="display:none">
+                    </div>
+                </div>
+
+                <button id="selectBtn" class="btn btn-primary upload-select-btn">
+                    Select Files
+                </button>
+            </div>
+
+            <!-- Upload Progress List -->
+            <div id="uploadList" class="upload-list"></div>
+
+            <!-- Upload Summary -->
+            <div id="uploadSummary" class="upload-summary" style="display:none">
+                <span id="summaryText"></span>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span id="serverInfo"></span>
+        </footer>
+    </div>
+
+    <script src="js/receive.js"></script>
+</body>
+</html>

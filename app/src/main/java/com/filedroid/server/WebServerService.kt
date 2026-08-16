@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import com.filedroid.MainActivity
 import com.filedroid.R
 import com.filedroid.model.ServerConfig
+import com.filedroid.model.ServerMode
 import com.filedroid.model.TransferLogEntry
 import com.filedroid.util.NetworkUtils
 
@@ -55,6 +56,14 @@ class WebServerService : Service() {
                 stopSelf()
             }
             else -> {
+                // Extract mode and shared paths from intent
+                val modeStr = intent?.getStringExtra(EXTRA_MODE) ?: ServerMode.SEND.name
+                val mode = try { ServerMode.valueOf(modeStr) } catch (e: Exception) { ServerMode.SEND }
+                val paths = intent?.getStringArrayListExtra(EXTRA_SHARED_PATHS)?.toSet() ?: emptySet()
+
+                config.serverMode = mode
+                config.sharedPaths = paths
+
                 startServer()
             }
         }
@@ -71,12 +80,10 @@ class WebServerService : Service() {
         }
 
         val port = config.port
-        val token = security.generateSessionToken()
         val protocol = if (config.httpsEnabled) "https" else "http"
 
         try {
             server = FileDroidServer(this, config, security, port).apply {
-                // Set up HTTPS if enabled
                 if (config.httpsEnabled) {
                     val sslFactory = SSLHelper.getSSLServerSocketFactory(this@WebServerService)
                     if (sslFactory != null) {
@@ -92,14 +99,12 @@ class WebServerService : Service() {
                 start()
             }
 
-            serverUrl = "$protocol://$ip:$port?token=$token"
+            serverUrl = "$protocol://$ip:$port"
             isRunning = true
 
-            // Acquire locks
             acquireWifiLock()
             acquireWakeLock()
 
-            // Start foreground
             val notification = buildNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
@@ -128,6 +133,7 @@ class WebServerService : Service() {
         }
 
         security.clearSessions()
+        TransferProgressManager.clearAll()
         releaseWifiLock()
         releaseWakeLock()
 
@@ -154,8 +160,6 @@ class WebServerService : Service() {
         return security.getConnectedClients().keys.toList()
     }
 
-    fun getSessionToken(): String = config.sessionToken
-
     // ---- Notification ----
 
     private fun createNotificationChannel() {
@@ -175,6 +179,10 @@ class WebServerService : Service() {
     private fun buildNotification(): Notification {
         val clients = security.getConnectedClients().size
         val url = serverUrl ?: "Starting..."
+        val modeText = when (config.serverMode) {
+            ServerMode.SEND -> "Sending files"
+            ServerMode.RECEIVE -> "Receiving files"
+        }
 
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
@@ -190,7 +198,7 @@ class WebServerService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_share)
-            .setContentTitle(getString(R.string.server_notification_title))
+            .setContentTitle("FileDroid — $modeText")
             .setContentText(getString(R.string.server_notification_text, url, clients))
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_media_pause, getString(R.string.stop), stopIntent)
@@ -224,9 +232,7 @@ class WebServerService : Service() {
 
     private fun releaseWifiLock() {
         try {
-            wifiLock?.let {
-                if (it.isHeld) it.release()
-            }
+            wifiLock?.let { if (it.isHeld) it.release() }
             wifiLock = null
         } catch (e: Exception) {
             e.printStackTrace()
@@ -249,9 +255,7 @@ class WebServerService : Service() {
 
     private fun releaseWakeLock() {
         try {
-            wakeLock?.let {
-                if (it.isHeld) it.release()
-            }
+            wakeLock?.let { if (it.isHeld) it.release() }
             wakeLock = null
         } catch (e: Exception) {
             e.printStackTrace()
@@ -273,5 +277,7 @@ class WebServerService : Service() {
         const val CHANNEL_ID = "filedroid_server"
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.filedroid.STOP_SERVER"
+        const val EXTRA_MODE = "server_mode"
+        const val EXTRA_SHARED_PATHS = "shared_paths"
     }
 }

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="2dp">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:foreground="?android:attr/selectableItemBackground"
+        app:cardCornerRadius="8dp"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        app:cardElevation="0dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <ImageView
+                android:id="@+id/ivThumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:background="@color/divider"
+                android:contentDescription="thumbnail" />
+
+            <!-- Selection check overlay -->
+            <View
+                android:id="@+id/viewOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:background="#40000000"
+                android:visibility="gone" />
+
+            <CheckBox
+                android:id="@+id/checkbox"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="4dp"
+                android:buttonTint="@color/primary"
+                android:background="#40FFFFFF" />
+
+            <!-- Duration badge (for videos) -->
+            <TextView
+                android:id="@+id/tvDuration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="4dp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textSize="10sp"
+                android:textColor="#FFFFFF"
+                android:background="#80000000"
+                android:visibility="gone"
+                tools:text="1:23"
+                tools:visibility="visible" />
+
+        </FrameLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>

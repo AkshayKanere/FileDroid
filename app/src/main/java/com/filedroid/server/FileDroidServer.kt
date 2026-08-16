@@ -1,7 +1,8 @@
-package com.filedroid.server
+﻿package com.filedroid.server
 
 import android.content.Context
 import com.filedroid.model.ServerConfig
+import com.filedroid.model.ServerMode
 import com.filedroid.model.TransferLogEntry
 import com.filedroid.nanohttpd.NanoHTTPD
 import java.io.ByteArrayInputStream
@@ -53,29 +54,8 @@ class FileDroidServer(
             return response
         }
 
-        // API endpoints require token validation
+        // API endpoints — open access (no token/PIN)
         if (uri.startsWith("/api/")) {
-            val token = security.extractToken(session.parms, session.headers)
-            if (!security.validateToken(token)) {
-                return newFixedLengthResponse(
-                    Response.Status.UNAUTHORIZED,
-                    "application/json",
-                    """{"error":"Invalid or missing access token"}"""
-                )
-            }
-
-            // PIN check (except for PIN auth endpoint itself)
-            if (security.isPinRequired() && !uri.startsWith("/api/auth/pin") && !uri.startsWith("/api/info")) {
-                val pinSession = security.extractPinSession(session.headers)
-                if (!security.isPinSessionValid(pinSession)) {
-                    return newFixedLengthResponse(
-                        Response.Status.FORBIDDEN,
-                        "application/json",
-                        """{"error":"PIN verification required","pinRequired":true}"""
-                    )
-                }
-            }
-
             return apiHandler.handle(session)
         }
 
@@ -86,10 +66,13 @@ class FileDroidServer(
     private fun serveStaticFile(uri: String): Response {
         var path = uri
         if (path == "/" || path.isEmpty()) {
-            path = "/index.html"
+            // Route to mode-specific page
+            path = when (config.serverMode) {
+                ServerMode.SEND -> "/send.html"
+                ServerMode.RECEIVE -> "/receive.html"
+            }
         }
 
-        // Remove leading slash
         val assetPath = "web${path}"
 
         return try {
@@ -103,7 +86,7 @@ class FileDroidServer(
                 ByteArrayInputStream(bytes), bytes.size.toLong()
             )
 
-            // Cache static assets
+            // Cache static assets (not HTML)
             if (!path.endsWith(".html")) {
                 response.addHeader("Cache-Control", "public, max-age=86400")
             }

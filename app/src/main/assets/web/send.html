@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4CAF50">
+    <title>FileDroid - Download Files</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span class="logo">📂 FileDroid</span>
+                <span class="mode-badge mode-send">📥 Download</span>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search files..." autocomplete="off">
+                    <button id="searchBtn" class="icon-btn" title="Search">🔍</button>
+                </div>
+                <button id="toggleView" class="icon-btn" title="Toggle view">
+                    <span id="viewIcon">▦</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Breadcrumbs -->
+        <nav id="breadcrumbs" class="breadcrumbs"></nav>
+
+        <!-- Toolbar -->
+        <div id="toolbar" class="toolbar" style="display:none">
+            <div class="toolbar-left">
+                <label class="select-all-label">
+                    <input type="checkbox" id="selectAll">
+                    <span id="selectedCount">0 selected</span>
+                </label>
+            </div>
+            <div class="toolbar-right">
+                <button id="downloadSelected" class="btn btn-sm">⬇️ Download Selected</button>
+            </div>
+        </div>
+
+        <!-- Sort Bar -->
+        <div class="sort-bar">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-btn active" data-sort="name">Name</button>
+            <button class="sort-btn" data-sort="date">Date</button>
+            <button class="sort-btn" data-sort="size">Size</button>
+        </div>
+
+        <!-- Scrollable content area -->
+        <div class="scroll-content">
+            <!-- File List -->
+            <main id="fileContainer" class="file-container grid-view"></main>
+
+            <!-- Loading -->
+            <div id="loading" class="loading" style="display:none">
+                <div class="spinner"></div>
+                <p>Loading files...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display:none">
+                <div class="empty-icon">📁</div>
+                <p>No files shared</p>
+            </div>
+        </div>
+
+        <!-- Preview Modal -->
+        <div id="previewModal" class="preview-modal" style="display:none">
+            <div class="preview-header">
+                <span id="previewTitle" class="preview-title"></span>
+                <div class="preview-actions">
+                    <a id="previewDownload" class="icon-btn" title="Download">⬇️</a>
+                    <button id="closePreview" class="icon-btn">✕</button>
+                </div>
+            </div>
+            <div id="previewContent" class="preview-content"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span id="serverInfo"></span>
+        </footer>
+    </div>
+
+    <script src="js/send.js"></script>
+</body>
+</html>

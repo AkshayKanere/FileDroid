@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    tools:context=".MainActivity">
+    tools:context=".TransferActivity">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -17,9 +17,9 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="@color/primary"
-            app:title="@string/app_name"
             app:titleTextColor="@color/on_primary"
-            app:menu="@menu/main_menu" />
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:navigationIconTint="@color/on_primary" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -34,7 +34,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Server Status Card -->
+            <!-- QR Code Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -49,33 +49,18 @@
                     android:padding="20dp"
                     android:gravity="center_horizontal">
 
-                    <!-- Status indicator -->
-                    <View
-                        android:id="@+id/statusDot"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:background="@drawable/status_dot"
-                        android:backgroundTint="@color/server_stopped" />
-
+                    <!-- Mode badge -->
                     <TextView
-                        android:id="@+id/tvServerStatus"
+                        android:id="@+id/tvModeBadge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/server_stopped"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="8dp" />
-
-                    <TextView
-                        android:id="@+id/tvServerUrl"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="4dp"
                         android:textSize="14sp"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="4dp"
-                        android:visibility="gone"
-                        tools:text="https://192.168.1.5:8080"
-                        tools:visibility="visible" />
+                        android:textStyle="bold"
+                        android:textColor="@color/on_primary"
+                        android:background="@drawable/badge_bg"
+                        tools:text="📤 Sending" />
 
                     <!-- QR Code -->
                     <ImageView
@@ -83,75 +68,44 @@
                         android:layout_width="220dp"
                         android:layout_height="220dp"
                         android:layout_marginTop="16dp"
-                        android:visibility="gone"
-                        android:contentDescription="@string/scan_qr_code"
-                        tools:visibility="visible" />
+                        android:contentDescription="@string/scan_qr_code" />
 
                     <TextView
-                        android:id="@+id/tvQrHint"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/scan_qr_code"
                         android:textSize="12sp"
                         android:textColor="@color/text_secondary"
-                        android:layout_marginTop="8dp"
-                        android:visibility="gone"
-                        tools:visibility="visible" />
+                        android:layout_marginTop="8dp" />
 
-                    <!-- Start/Stop Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnToggleServer"
-                        android:layout_width="200dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="20dp"
-                        android:text="@string/start_server"
-                        android:textSize="16sp"
-                        app:cornerRadius="24dp" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Connected Clients Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardClients"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:visibility="gone"
-                app:cardElevation="2dp"
-                app:cardCornerRadius="12dp"
-                tools:visibility="visible">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
+                    <!-- URL -->
                     <TextView
+                        android:id="@+id/tvServerUrl"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/connected_clients"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:textSize="14sp"
+                        android:textColor="@color/accent"
+                        android:textStyle="bold"
+                        android:layout_marginTop="8dp"
+                        tools:text="http://192.168.1.5:8080" />
 
+                    <!-- Connected clients -->
                     <TextView
                         android:id="@+id/tvClients"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textSize="14sp"
+                        android:textSize="12sp"
                         android:textColor="@color/text_secondary"
-                        tools:text="192.168.1.10\n192.168.1.15" />
+                        android:layout_marginTop="8dp"
+                        tools:text="1 device connected" />
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Transfer Log Card -->
+            <!-- Transfer Progress Card -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardTransferLog"
+                android:id="@+id/cardProgress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -172,18 +126,18 @@
                         android:textStyle="bold" />
 
                     <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/rvTransferLog"
+                        android:id="@+id/rvTransfers"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:nestedScrollingEnabled="false" />
 
                     <TextView
-                        android:id="@+id/tvNoActivity"
+                        android:id="@+id/tvWaiting"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/no_activity"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/waiting_for_connection"
                         android:textAlignment="center"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp" />
@@ -191,6 +145,16 @@
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Stop Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/stop_sharing"
+                android:textSize="16sp"
+                app:cornerRadius="24dp"
+                app:backgroundTint="@color/error" />
 
         </LinearLayout>
 

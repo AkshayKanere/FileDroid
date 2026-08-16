@@ -47,6 +47,9 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.3")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.3")
+    implementation("androidx.fragment:fragment-ktx:1.8.1")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
 
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")
