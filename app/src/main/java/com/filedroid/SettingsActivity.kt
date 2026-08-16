@@ -50,7 +50,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val maxSize = binding.etMaxUploadSize.text.toString().toIntOrNull()
         if (maxSize == null || maxSize < 1 || maxSize > 10240) {
-            Toast.makeText(this, "Max upload size must be between 1 and 10240 MB", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Max file size must be between 1 MB and 10 GB", Toast.LENGTH_SHORT).show()
             return
         }
 

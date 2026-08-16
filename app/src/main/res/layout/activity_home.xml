@@ -60,7 +60,7 @@
             android:focusable="true"
             app:cardElevation="4dp"
             app:cardCornerRadius="16dp"
-            app:rippleColor="@color/primary_light">
+            app:rippleColor="@color/accent_light">
 
             <LinearLayout
                 android:layout_width="match_parent"

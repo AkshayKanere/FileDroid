@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#FF4CAF50</color>
-    <color name="primary_dark">#FF388E3C</color>
-    <color name="primary_light">#FFC8E6C9</color>
-    <color name="accent">#FF2196F3</color>
+    <color name="primary">#FF1976D2</color>
+    <color name="primary_dark">#FF1565C0</color>
+    <color name="primary_light">#FFBBDEFB</color>
+    <color name="accent">#FF42A5F5</color>
     <color name="background">#FFF5F5F5</color>
     <color name="surface">#FFFFFFFF</color>
     <color name="on_primary">#FFFFFFFF</color>
@@ -12,7 +12,7 @@
     <color name="divider">#FFBDBDBD</color>
     <color name="error">#FFD32F2F</color>
     <color name="success">#FF4CAF50</color>
-    <color name="accent_light">#FFBBDEFB</color>
+    <color name="accent_light">#FFE3F2FD</color>
     <color name="server_running">#FF4CAF50</color>
     <color name="server_stopped">#FF9E9E9E</color>
 </resources>

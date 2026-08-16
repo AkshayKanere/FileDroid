@@ -9,9 +9,10 @@
     let isUploading = false;
     let completedCount = 0;
     let failedCount = 0;
+    let cancelledCount = 0;
     let totalBytes = 0;
+    let activeXhr = null;
 
-    // ---- Init ----
     init();
 
     async function init() {
@@ -24,10 +25,8 @@
         try {
             const res = await fetch('/api/info');
             const info = await res.json();
-            const el = document.getElementById('serverInfo');
-            const free = formatBytes(info.freeSpace);
-            const total = formatBytes(info.totalSpace);
-            el.textContent = `${info.deviceName} \u2022 ${free} free of ${total} \u2022 Max upload: ${formatBytes(info.uploadMaxSize)}`;
+            document.getElementById('serverInfo').textContent =
+                `${info.deviceName} \u2022 ${formatBytes(info.freeSpace)} free of ${formatBytes(info.totalSpace)} \u2022 Max: ${formatBytes(info.uploadMaxSize)}`;
         } catch (e) {}
     }
 
@@ -35,9 +34,7 @@
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
 
-        // Click to select
         dropzone.addEventListener('click', () => fileInput.click());
-
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 addFilesToQueue(Array.from(fileInput.files));
@@ -45,31 +42,19 @@
             }
         });
 
-        // Drag and drop
-        ['dragenter', 'dragover'].forEach(event => {
-            dropzone.addEventListener(event, (e) => {
-                e.preventDefault();
-                dropzone.classList.add('dragover');
-            });
+        ['dragenter', 'dragover'].forEach(ev => {
+            dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragover'); });
         });
-
-        ['dragleave', 'drop'].forEach(event => {
-            dropzone.addEventListener(event, (e) => {
-                e.preventDefault();
-                dropzone.classList.remove('dragover');
-            });
+        ['dragleave', 'drop'].forEach(ev => {
+            dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); });
         });
-
-        dropzone.addEventListener('drop', (e) => {
+        dropzone.addEventListener('drop', e => {
             const files = Array.from(e.dataTransfer.files);
-            if (files.length > 0) {
-                addFilesToQueue(files);
-            }
+            if (files.length > 0) addFilesToQueue(files);
         });
 
-        // Prevent default drag on body
-        document.addEventListener('dragover', (e) => e.preventDefault());
-        document.addEventListener('drop', (e) => e.preventDefault());
+        document.addEventListener('dragover', e => e.preventDefault());
+        document.addEventListener('drop', e => e.preventDefault());
     }
 
     function setupButtons() {
@@ -83,29 +68,18 @@
     function addFilesToQueue(files) {
         for (const file of files) {
             const id = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const entry = {
-                id,
-                file,
-                name: file.name,
-                size: file.size,
-                status: 'pending', // pending, uploading, done, error
-                progress: 0,
-                speed: 0,
-                error: null
-            };
-            uploadQueue.push(entry);
-            renderUploadItem(entry);
+            uploadQueue.push({
+                id, file, name: file.name, size: file.size,
+                status: 'pending', progress: 0, speed: 0, error: null, xhr: null
+            });
+            renderUploadItem(uploadQueue[uploadQueue.length - 1]);
         }
-
-        if (!isUploading) {
-            processQueue();
-        }
+        if (!isUploading) processQueue();
     }
 
     async function processQueue() {
         isUploading = true;
-
-        while (uploadQueue.length > 0) {
+        while (true) {
             const entry = uploadQueue.find(e => e.status === 'pending');
             if (!entry) break;
 
@@ -114,19 +88,23 @@
 
             try {
                 await uploadFile(entry);
-                entry.status = 'done';
-                entry.progress = 100;
-                completedCount++;
-                totalBytes += entry.size;
+                if (entry.status === 'cancelled') {
+                    cancelledCount++;
+                } else {
+                    entry.status = 'done';
+                    entry.progress = 100;
+                    completedCount++;
+                    totalBytes += entry.size;
+                }
             } catch (e) {
-                entry.status = 'error';
-                entry.error = e.message;
-                failedCount++;
+                if (entry.status !== 'cancelled') {
+                    entry.status = 'error';
+                    entry.error = e.message;
+                    failedCount++;
+                }
             }
-
             updateUploadItem(entry);
         }
-
         isUploading = false;
         updateSummary();
     }
@@ -134,12 +112,13 @@
     function uploadFile(entry) {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
+            entry.xhr = xhr;
+            activeXhr = xhr;
             const formData = new FormData();
             formData.append('file', entry.file);
-
             const startTime = Date.now();
 
-            xhr.upload.addEventListener('progress', (e) => {
+            xhr.upload.addEventListener('progress', e => {
                 if (e.lengthComputable) {
                     entry.progress = Math.round((e.loaded / e.total) * 100);
                     const elapsed = (Date.now() - startTime) / 1000;
@@ -149,22 +128,29 @@
             });
 
             xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve();
-                } else {
-                    reject(new Error(`Upload failed (${xhr.status})`));
-                }
+                activeXhr = null;
+                entry.xhr = null;
+                xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Failed (${xhr.status})`));
             });
-
-            xhr.addEventListener('error', () => reject(new Error('Network error')));
-            xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+            xhr.addEventListener('error', () => { activeXhr = null; entry.xhr = null; reject(new Error('Network error')); });
+            xhr.addEventListener('abort', () => { activeXhr = null; entry.xhr = null; entry.status = 'cancelled'; resolve(); });
 
             xhr.open('POST', '/api/upload');
             xhr.send(formData);
         });
     }
 
-    // ---- UI Rendering ----
+    function cancelUpload(entry) {
+        if (entry.status === 'pending') {
+            entry.status = 'cancelled';
+            cancelledCount++;
+            updateUploadItem(entry);
+        } else if (entry.status === 'uploading' && entry.xhr) {
+            entry.xhr.abort();
+        }
+    }
+
+    // ---- UI ----
 
     function renderUploadItem(entry) {
         const list = document.getElementById('uploadList');
@@ -172,19 +158,24 @@
         div.id = entry.id;
         div.className = 'upload-item';
 
-        div.innerHTML = `
-            <div class="upload-item-header">
-                <span class="upload-item-icon">${getFileIcon(entry.name)}</span>
-                <span class="upload-item-name">${escapeHtml(entry.name)}</span>
-                <span class="upload-item-size">${formatBytes(entry.size)}</span>
-            </div>
-            <div class="upload-item-progress">
-                <div class="progress-bar">
-                    <div class="progress-bar-fill" style="width: 0%"></div>
-                </div>
-                <span class="upload-item-status">Waiting...</span>
-            </div>
-        `;
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'upload-item-header';
+        headerDiv.innerHTML = `<span class="upload-item-icon">${getFileIcon(entry.name)}</span>
+            <span class="upload-item-name">${escapeHtml(entry.name)}</span>
+            <span class="upload-item-size">${formatBytes(entry.size)}</span>`;
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'upload-cancel-btn';
+        cancelBtn.textContent = '\u2715';
+        cancelBtn.title = 'Cancel';
+        cancelBtn.addEventListener('click', () => cancelUpload(entry));
+        headerDiv.appendChild(cancelBtn);
+
+        div.appendChild(headerDiv);
+        div.innerHTML += `<div class="upload-item-progress">
+            <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+            <span class="upload-item-status">Waiting...</span>
+        </div>`;
 
         list.appendChild(div);
     }
@@ -192,27 +183,37 @@
     function updateUploadItem(entry) {
         const div = document.getElementById(entry.id);
         if (!div) return;
-
         const fill = div.querySelector('.progress-bar-fill');
         const status = div.querySelector('.upload-item-status');
+        const cancelBtn = div.querySelector('.upload-cancel-btn');
 
         fill.style.width = entry.progress + '%';
 
         switch (entry.status) {
             case 'uploading':
-                fill.classList.remove('error', 'success');
+                fill.className = 'progress-bar-fill';
                 status.textContent = `${entry.progress}% \u2022 ${formatBytes(entry.speed)}/s`;
+                status.className = 'upload-item-status';
                 break;
             case 'done':
-                fill.classList.add('success');
+                fill.className = 'progress-bar-fill success';
                 fill.style.width = '100%';
                 status.textContent = '\u2705 Sent';
-                status.classList.add('success');
+                status.className = 'upload-item-status success';
+                if (cancelBtn) cancelBtn.style.display = 'none';
                 break;
             case 'error':
-                fill.classList.add('error');
+                fill.className = 'progress-bar-fill error';
                 status.textContent = '\u274C ' + (entry.error || 'Failed');
-                status.classList.add('error');
+                status.className = 'upload-item-status error';
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                break;
+            case 'cancelled':
+                fill.className = 'progress-bar-fill';
+                fill.style.width = '0%';
+                status.textContent = '\u26D4 Cancelled';
+                status.className = 'upload-item-status error';
+                if (cancelBtn) cancelBtn.style.display = 'none';
                 break;
             default:
                 status.textContent = 'Waiting...';
@@ -222,11 +223,11 @@
     function updateSummary() {
         const summary = document.getElementById('uploadSummary');
         const text = document.getElementById('summaryText');
-
-        if (completedCount > 0 || failedCount > 0) {
+        if (completedCount > 0 || failedCount > 0 || cancelledCount > 0) {
             summary.style.display = 'block';
-            let msg = `✅ ${completedCount} file${completedCount !== 1 ? 's' : ''} sent (${formatBytes(totalBytes)})`;
-            if (failedCount > 0) msg += ` • ❌ ${failedCount} failed`;
+            let msg = `\u2705 ${completedCount} sent (${formatBytes(totalBytes)})`;
+            if (failedCount > 0) msg += ` \u2022 \u274C ${failedCount} failed`;
+            if (cancelledCount > 0) msg += ` \u2022 \u26D4 ${cancelledCount} cancelled`;
             text.textContent = msg;
         }
     }
@@ -235,26 +236,20 @@
 
     function getFileIcon(name) {
         const ext = (name || '').split('.').pop().toLowerCase();
-        const icons = {
-            jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️',
-            mp4: '🎬', mkv: '🎬', avi: '🎬', mov: '🎬',
-            mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵',
-            pdf: '📕', doc: '📝', docx: '📝', txt: '📄',
-            xls: '📊', xlsx: '📊', zip: '📦', apk: '📱'
-        };
-        return icons[ext] || '📄';
+        const m = { jpg:'\uD83D\uDDBC\uFE0F',jpeg:'\uD83D\uDDBC\uFE0F',png:'\uD83D\uDDBC\uFE0F',gif:'\uD83D\uDDBC\uFE0F',webp:'\uD83D\uDDBC\uFE0F',
+            mp4:'\uD83C\uDFAC',mkv:'\uD83C\uDFAC',avi:'\uD83C\uDFAC',mov:'\uD83C\uDFAC',
+            mp3:'\uD83C\uDFB5',wav:'\uD83C\uDFB5',flac:'\uD83C\uDFB5',aac:'\uD83C\uDFB5',
+            pdf:'\uD83D\uDCD5',doc:'\uD83D\uDCDD',docx:'\uD83D\uDCDD',txt:'\uD83D\uDCC4',
+            xls:'\uD83D\uDCCA',xlsx:'\uD83D\uDCCA',zip:'\uD83D\uDCE6',apk:'\uD83D\uDCF1' };
+        return m[ext] || '\uD83D\uDCC4';
     }
 
     function formatBytes(bytes) {
         if (!bytes || bytes <= 0) return '0 B';
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const u = ['B','KB','MB','GB','TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+        return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + u[i];
     }
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+    function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 })();

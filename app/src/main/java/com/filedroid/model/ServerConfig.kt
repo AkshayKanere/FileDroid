@@ -49,6 +49,6 @@ class ServerConfig(context: Context) {
         private const val KEY_MAX_UPLOAD_SIZE = "max_upload_size_mb"
 
         const val DEFAULT_PORT = 8080
-        const val DEFAULT_MAX_UPLOAD_MB = 500
+        const val DEFAULT_MAX_UPLOAD_MB = 3072  // 3 GB
     }
 }
