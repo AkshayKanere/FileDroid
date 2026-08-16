@@ -10,11 +10,19 @@
     let selectedFiles = new Set();
     let currentSort = 'name';
     let viewMode = localStorage.getItem('fd_viewMode') || 'grid';
+    let thumbObserver = null;
+    let longPressTimer = null;
+    let isSelectionMode = false;
+    const PAGE_SIZE = 60;
+    let currentOffset = 0;
+    let hasMore = false;
+    let isLoadingMore = false;
 
     // ---- Init ----
     init();
 
     async function init() {
+        setupThumbObserver();
         applyViewMode();
         setupEventListeners();
         await loadServerInfo();
@@ -46,6 +54,36 @@
                 closePreview();
             }
         });
+
+        // Infinite scroll for pagination
+        document.querySelector('.scroll-content').addEventListener('scroll', debounce(handleScroll, 200));
+    }
+
+    // ---- Lazy Thumbnail Loading ----
+
+    function setupThumbObserver() {
+        thumbObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const src = img.dataset.src;
+                    if (src) {
+                        img.src = src;
+                        img.removeAttribute('data-src');
+                    }
+                    thumbObserver.unobserve(img);
+                }
+            });
+        }, { rootMargin: '200px' });
+    }
+
+    function createLazyThumbEl(thumbUrl, icon) {
+        if (!thumbUrl) return null;
+        const img = document.createElement('img');
+        img.dataset.src = thumbUrl;
+        img.onerror = function() { this.parentElement.textContent = icon; };
+        thumbObserver.observe(img);
+        return img;
     }
 
     // ---- View Mode ----
@@ -93,13 +131,19 @@
         loading.style.display = 'flex';
         empty.style.display = 'none';
         selectedFiles.clear();
+        isSelectionMode = false;
+        currentOffset = 0;
+        currentFiles = [];
+        hasMore = false;
         updateToolbar();
 
         try {
-            const url = path ? `/api/files?path=${encodeURIComponent(path)}` : '/api/files';
+            let url = path ? `/api/files?path=${encodeURIComponent(path)}&offset=0&limit=${PAGE_SIZE}` : '/api/files';
             const data = await fetchJSON(url);
             currentPath = data.path;
             currentFiles = data.items || [];
+            hasMore = data.hasMore || false;
+            currentOffset = currentFiles.length;
 
             renderBreadcrumbs(data.breadcrumbs || []);
             renderFiles(sortFiles(currentFiles));
@@ -107,6 +151,54 @@
             container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load files</p></div>`;
         } finally {
             loading.style.display = 'none';
+        }
+    }
+
+    // ---- Pagination / Infinite Scroll ----
+
+    function handleScroll() {
+        if (!hasMore || isLoadingMore) return;
+        const scrollEl = document.querySelector('.scroll-content');
+        const nearBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 300;
+        if (nearBottom) loadMore();
+    }
+
+    async function loadMore() {
+        if (!hasMore || isLoadingMore || !currentPath) return;
+        isLoadingMore = true;
+        showLoadMoreIndicator(true);
+
+        try {
+            const url = `/api/files?path=${encodeURIComponent(currentPath)}&offset=${currentOffset}&limit=${PAGE_SIZE}`;
+            const data = await fetchJSON(url);
+            const newItems = data.items || [];
+            hasMore = data.hasMore || false;
+            currentFiles = currentFiles.concat(newItems);
+            currentOffset += newItems.length;
+
+            // Append new items without re-rendering existing ones
+            const container = document.getElementById('fileContainer');
+            const sorted = sortFiles(newItems);
+            sorted.forEach(file => container.appendChild(createFileItem(file)));
+            updateSelectAllBtn();
+        } catch (e) {}
+        finally {
+            isLoadingMore = false;
+            showLoadMoreIndicator(false);
+        }
+    }
+
+    function showLoadMoreIndicator(show) {
+        let el = document.getElementById('loadMoreSpinner');
+        if (show && !el) {
+            el = document.createElement('div');
+            el.id = 'loadMoreSpinner';
+            el.className = 'loading';
+            el.innerHTML = '<div class="spinner"></div><p>Loading more...</p>';
+            el.style.padding = '20px';
+            document.querySelector('.scroll-content').appendChild(el);
+        } else if (!show && el) {
+            el.remove();
         }
     }
 
@@ -153,18 +245,10 @@
         updateSelectAllBtn();
     }
 
-    function createThumbEl(thumbUrl, icon) {
-        if (!thumbUrl) return null;
-        const img = document.createElement('img');
-        img.src = thumbUrl;
-        img.loading = 'lazy';
-        img.onerror = function() { this.parentElement.textContent = icon; };
-        return img;
-    }
-
     function createFileItem(file) {
         const div = document.createElement('div');
         div.className = 'file-item' + (selectedFiles.has(file.path) ? ' selected' : '');
+        div.dataset.path = file.path;
 
         const icon = getFileIcon(file);
         const mime = file.mimeType || '';
@@ -174,7 +258,7 @@
         if (viewMode === 'grid') {
             const thumbDiv = document.createElement('div');
             thumbDiv.className = 'grid-thumb';
-            const thumbImg = createThumbEl(thumbUrl, icon);
+            const thumbImg = createLazyThumbEl(thumbUrl, icon);
             if (thumbImg) {
                 thumbDiv.appendChild(thumbImg);
             } else {
@@ -214,7 +298,7 @@
 
             const thumbDiv = document.createElement('div');
             thumbDiv.className = 'file-thumb';
-            const thumbImg = createThumbEl(thumbUrl, icon);
+            const thumbImg = createLazyThumbEl(thumbUrl, icon);
             if (thumbImg) {
                 thumbDiv.appendChild(thumbImg);
             } else {
@@ -239,31 +323,53 @@
             }
         }
 
-        // Events
+        // Events — checkbox click
         const checkbox = div.querySelector('.file-select');
-        if (checkbox && !file.directory) {
+        if (checkbox && !isDir(file)) {
             checkbox.addEventListener('click', (e) => {
                 e.stopPropagation();
                 toggleSelect(file, div);
             });
         }
 
+        // Long-press to select (mobile)
+        if (!isDir(file)) {
+            div.addEventListener('touchstart', (e) => {
+                if (e.target.classList.contains('file-select') || e.target.type === 'checkbox') return;
+                longPressTimer = setTimeout(() => {
+                    longPressTimer = null;
+                    isSelectionMode = true;
+                    toggleSelect(file, div);
+                    // Haptic feedback if available
+                    if (navigator.vibrate) navigator.vibrate(30);
+                }, 500);
+            }, { passive: true });
+
+            div.addEventListener('touchend', () => {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+            div.addEventListener('touchmove', () => {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+        }
+
+        // Click handler
         div.addEventListener('click', (e) => {
             if (e.target.classList.contains('file-select') || e.target.type === 'checkbox') return;
             if (e.target.classList.contains('download-btn')) { downloadFile(file); return; }
             if (isDir(file)) {
                 navigateTo(file.path);
-            } else {
-                previewFile(file);
+                return;
             }
+            // In selection mode, tap toggles selection instead of preview
+            if (isSelectionMode) {
+                toggleSelect(file, div);
+                return;
+            }
+            previewFile(file);
         });
 
         return div;
-    }
-
-    function formatDuration(file) {
-        // Try to detect duration from filename patterns or show video icon
-        return '\u25B6';
     }
 
     // ---- Selection ----
@@ -278,7 +384,12 @@
         }
         const cb = div.querySelector('.file-select');
         if (cb) cb.checked = selectedFiles.has(file.path);
+
+        // Exit selection mode when nothing selected
+        if (selectedFiles.size === 0) isSelectionMode = false;
+
         updateToolbar();
+        updateSelectAllBtn();
     }
 
     function handleSelectAll(e) {
@@ -291,6 +402,7 @@
             const cb = div.querySelector('.file-select');
             if (cb) { cb.checked = checked; div.classList.toggle('selected', checked); }
         });
+        isSelectionMode = checked;
         updateToolbar();
         updateSelectAllBtn();
     }
@@ -309,6 +421,7 @@
         });
         const selectAllCb = document.getElementById('selectAll');
         if (selectAllCb) selectAllCb.checked = checked;
+        isSelectionMode = checked;
         updateToolbar();
         updateSelectAllBtn();
     }
@@ -320,6 +433,15 @@
         btn.textContent = allSelected ? '☐ Deselect All' : '☑ Select All';
     }
 
+    function getSelectedTotalSize() {
+        let total = 0;
+        for (const path of selectedFiles) {
+            const file = currentFiles.find(f => f.path === path);
+            if (file) total += (file.size || 0);
+        }
+        return total;
+    }
+
     function updateToolbar() {
         const toolbar = document.getElementById('toolbar');
         const btn = document.getElementById('downloadSelected');
@@ -327,11 +449,13 @@
         if (count > 0) {
             toolbar.classList.remove('toolbar-disabled');
             btn.disabled = false;
+            const totalSize = formatBytes(getSelectedTotalSize());
+            document.getElementById('selectedCount').textContent = `${count} selected \u00B7 ${totalSize}`;
         } else {
             toolbar.classList.add('toolbar-disabled');
             btn.disabled = true;
+            document.getElementById('selectedCount').textContent = 'No files selected';
         }
-        document.getElementById('selectedCount').textContent = count > 0 ? `${count} selected` : 'No files selected';
     }
 
     // ---- Downloads ----
@@ -349,10 +473,35 @@
         if (selectedFiles.size === 0) return;
         const paths = Array.from(selectedFiles);
         const files = paths.map(p => currentFiles.find(f => f.path === p)).filter(f => f && !isDir(f));
+        const totalSize = formatBytes(getSelectedTotalSize());
+        showToast(`⬇️ Downloading ${files.length} file${files.length > 1 ? 's' : ''} (${totalSize})...`);
         for (let i = 0; i < files.length; i++) {
             downloadFile(files[i]);
             if (i < files.length - 1) await new Promise(r => setTimeout(r, 800));
         }
+    }
+
+    // ---- Toast Notification ----
+
+    function showToast(message, duration) {
+        duration = duration || 3000;
+        // Remove existing toast if any
+        const existing = document.getElementById('fdToast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.id = 'fdToast';
+        toast.className = 'fd-toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        // Trigger animation
+        requestAnimationFrame(() => toast.classList.add('fd-toast-show'));
+
+        setTimeout(() => {
+            toast.classList.remove('fd-toast-show');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, duration);
     }
 
     // ---- Preview ----
@@ -427,6 +576,7 @@
         try {
             const data = await fetchJSON(`/api/search?q=${encodeURIComponent(query)}`);
             currentFiles = data.results || [];
+            hasMore = false; // search results are not paginated
             renderFiles(sortFiles(currentFiles));
         } catch (e) {}
     }

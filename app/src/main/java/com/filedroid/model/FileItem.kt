@@ -16,7 +16,9 @@ data class FileListResponse(
     val items: List<FileItem>,
     val canUpload: Boolean,
     val breadcrumbs: List<Breadcrumb>,
-    val totalItems: Int
+    val totalItems: Int,
+    val hasMore: Boolean = false,
+    val offset: Int = 0
 )
 
 data class Breadcrumb(

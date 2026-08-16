@@ -88,25 +88,38 @@ class ApiHandler(
         val sanitized = security.sanitizePath(requestedPath, security.getAllowedRoots())
             ?: return jsonError(Response.Status.FORBIDDEN, "Invalid path")
 
-        return serveDirectory(sanitized)
+        val offset = params["offset"]?.toIntOrNull() ?: 0
+        val limit = params["limit"]?.toIntOrNull() ?: 0
+        return serveDirectory(sanitized, offset, limit)
     }
 
-    private fun serveDirectory(path: String): Response {
+    private fun serveDirectory(path: String, offset: Int = 0, limit: Int = 0): Response {
         val dir = File(path)
         if (!dir.exists()) return jsonError(Response.Status.NOT_FOUND, "Directory not found")
         if (!dir.isDirectory) return jsonError(Response.Status.BAD_REQUEST, "Not a directory")
 
-        val items = FileUtils.listDirectory(path).filter { security.isPathAllowed(it.path) }
+        val allItems = FileUtils.listDirectory(path).filter { security.isPathAllowed(it.path) }
+        val totalItems = allItems.size
+
+        // Apply pagination if limit > 0
+        val (pagedItems, hasMore) = if (limit > 0) {
+            val end = minOf(offset + limit, totalItems)
+            Pair(allItems.subList(offset.coerceAtMost(totalItems), end), end < totalItems)
+        } else {
+            Pair(allItems, false)
+        }
 
         val breadcrumbs = listOf(Breadcrumb("Shared Files", "/")) +
             if (path != "/") listOf(Breadcrumb(File(path).name, path)) else emptyList()
 
         val response = FileListResponse(
             path = path,
-            items = items,
+            items = pagedItems,
             canUpload = false,
             breadcrumbs = breadcrumbs,
-            totalItems = items.size
+            totalItems = totalItems,
+            hasMore = hasMore,
+            offset = offset
         )
         return jsonResponse(response)
     }
@@ -300,9 +313,8 @@ class ApiHandler(
             Response.Status.OK, "image/jpeg",
             ByteArrayInputStream(thumbData), thumbData.size.toLong()
         )
-        response.addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
-        response.addHeader("Pragma", "no-cache")
-        response.addHeader("Expires", "0")
+        // Thumbnails use ?t={modified} as cache key, so browser caching is safe
+        response.addHeader("Cache-Control", "public, max-age=86400")
         return response
     }
 
